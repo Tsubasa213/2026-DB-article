@@ -1,0 +1,182 @@
+/* ===== 全体 ===== */
+body {
+  margin-left: 23%;
+  margin-right: 23%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #222;
+  background: #fff;
+  line-height: 1.75;
+}
+
+/* ===== ヘッダー ===== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #ddd;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 100;
+}
+
+.site-title {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+/* ===== ハンバーガーボタン ===== */
+.menu-btn {
+  font-size: 1.6rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+/* ===== サイドメニュー ===== */
+#sideMenu {
+  position: fixed;
+  top: 0;
+  right: -240px;
+  width: 220px;
+  height: 100%;
+  background: #f8f9fa;
+  padding: 24px 16px;
+  border-left: 1px solid #ddd;
+  transition: right 0.25s ease;
+  z-index: 200;
+}
+
+#sideMenu.open {
+  right: 0;
+}
+
+#sideMenu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#sideMenu li {
+  margin-bottom: 14px;
+}
+
+#sideMenu a {
+  text-decoration: none;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+/* ===== 本文エリア ===== */
+.content {
+  /* 左右10cmずつ空ける（合計20cm） */
+  max-width: calc(100% - 10%);
+
+  /* 画面が広すぎる場合の上限 */
+  width: 100%;
+  margin: 48px auto;
+
+  /* 内側余白（本文が端に寄らない） */
+  padding: 0 2rem;
+}
+
+
+/* ===== 見出し ===== */
+h1 {
+  font-size: 2rem;
+  margin: 0 0 1.5em;
+}
+
+h2 {
+  margin-top: 3em;
+  margin-bottom: 1em;
+  padding-left: 12px;
+  border-left: 6px solid #555;
+  font-size: 1.5rem;
+  scroll-margin-top: 72px;
+}
+
+h3 {
+  margin-top: 2.2em;
+  margin-bottom: 0.8em;
+  font-size: 1.2rem;
+}
+
+/* ===== 段落 ===== */
+p {
+  margin: 1.1em 0;
+}
+
+/* ===== フッター ===== */
+.footer {
+  margin: 64px 0 32px;
+  padding-top: 16px;
+  border-top: 1px solid #e1e1e1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.footer-link {
+  color: #1f6feb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footer-link:hover {
+  text-decoration: underline;
+}
+
+.footer-text {
+  margin: 0;
+}
+
+/* ===== リスト ===== */
+ul, ol {
+  margin: 1em 0 1em 1.5em;
+}
+
+/* ===== コード ===== */
+pre {
+  margin: 1.8em 0;
+  padding: 18px;
+  background: #f6f8fa;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.9rem;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ===== レスポンシブ対応 ===== */
+@media (max-width: 768px) {
+  .content {
+    margin: 32px auto;
+    padding: 0 16px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+  }
+
+  body {
+    line-height: 1.7;
+  }
+}

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="/style.css">
+  <title>PostgreSQLにおけるPoint In Time Recoveryの実践</title>
+</head>
+<body>
+
+<header class="header">
+  <h2 class="site-title">DB技術記事</h2>
+  <button class="menu-btn" id="menuBtn">☰</button>
+</header>
+
+<h1>PostgreSQLにおけるPoint In Time Recoveryの実践</h1>
+
+<h2>1. はじめに</h2>
+<p>
+本記事では、PostgreSQL 17 の Docker コンテナ環境を用いて、
+Point In Time Recovery（PITR）を実際に検証する。
+</p>
+
+<h2>2. 実験環境</h2>
+<ul>
+  <li>PostgreSQL 17（Docker）</li>
+  <li>授業提供コンテナ環境</li>
+</ul>
+
+<h2>3. PITRの前提知識（最小限）</h2>
+
+<h2>4. ベースバックアップの取得</h2>
+<pre><code>
+pg_basebackup -D /backup/base -Fp -Xs -P
+</code></pre>
+
+<h2>5. WALアーカイブの挙動確認</h2>
+
+<h2>6. 障害発生実験</h2>
+<pre><code>
+DROP TABLE sample_table;
+</code></pre>
+
+<h2>7. PITRによる復旧</h2>
+
+<h2>8. 考察</h2>
+
+<h2>9. 定着確認問題</h2>
+
+<h2>10. 演習課題（解答例付き）</h2>
+
+
+<footer class="footer">
+  <a class="footer-link" href="https://github.com/Tsubasa213" target="_blank" rel="noopener noreferrer">GitHub</a>
+  <p class="footer-text">© copyright 2026 Tsubasa213/つばさ all right resolved.</p>
+</footer>
+
+
+</body>
+<script src="/main.js"></script>
+</html>
+
