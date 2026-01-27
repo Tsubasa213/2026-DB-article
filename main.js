@@ -44,6 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
   menuBtn.addEventListener("click", () => {
     isOpen = !isOpen;
     menu.classList.toggle("open", isOpen);
+    document.body.classList.toggle("menu-open", isOpen);
   });
 
   // メニュー内リンククリック時に閉じる
@@ -51,6 +52,61 @@ document.addEventListener("DOMContentLoaded", () => {
     if (event.target instanceof HTMLAnchorElement) {
       isOpen = false;
       menu.classList.remove("open");
+      document.body.classList.remove("menu-open");
     }
+  });
+
+  // 穴埋めの表示切り替え
+  document.body.addEventListener("click", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.classList.contains("masked")) {
+      target.classList.toggle("revealed");
+    }
+  });
+
+  // コードブロックにコピー用ボタンを追加（行を消費しない）
+  const codeBlocks = document.querySelectorAll("pre");
+  codeBlocks.forEach((pre) => {
+    if (pre.parentElement?.classList.contains("code-wrapper")) return;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "code-wrapper";
+
+    pre.parentNode?.insertBefore(wrapper, pre);
+    wrapper.appendChild(pre);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "code-copy-btn";
+    button.textContent = "コピー";
+    button.setAttribute("aria-label", "コードをコピー");
+
+    button.addEventListener("click", async () => {
+      const code = pre.querySelector("code");
+      const text = code ? code.innerText : pre.innerText;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "コピー済み";
+        setTimeout(() => {
+          button.textContent = "コピー";
+        }, 1200);
+      } catch (error) {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        button.textContent = "コピー済み";
+        setTimeout(() => {
+          button.textContent = "コピー";
+        }, 1200);
+      }
+    });
+
+    wrapper.appendChild(button);
   });
 });
