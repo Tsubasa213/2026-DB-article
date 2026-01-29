@@ -1,0 +1,311 @@
+/* ===== 全体 ===== */
+body {
+  margin-left: 23%;
+  margin-right: 23%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #222;
+  background: #fbfcfe;
+  line-height: 1.8;
+  font-size: 1.12rem;
+}
+
+body.menu-open {
+  overflow: hidden;
+}
+
+/* ===== ヘッダー ===== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #ddd;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 100;
+}
+
+.site-title {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+/* ===== ハンバーガーボタン ===== */
+.menu-btn {
+  font-size: 1.6rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+/* ===== サイドメニュー ===== */
+#sideMenu {
+  position: fixed;
+  top: 0;
+  right: -240px;
+  width: 220px;
+  height: 100%;
+  background: #f8f9fa;
+  padding: 24px 16px;
+  border-left: 1px solid #ddd;
+  transition: right 0.25s ease;
+  z-index: 200;
+  overflow-y: auto;
+}
+
+
+#sideMenu.open {
+  right: 0;
+}
+
+#sideMenu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#sideMenu li {
+  margin-bottom: 14px;
+}
+
+#sideMenu a {
+  text-decoration: none;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+/* ===== 本文エリア ===== */
+.content {
+  /* 左右10cmずつ空ける（合計20cm） */
+  max-width: calc(100% - 10%);
+
+  /* 画面が広すぎる場合の上限 */
+  width: 100%;
+  margin: 48px auto;
+
+  /* 内側余白（本文が端に寄らない） */
+  padding: 0 2rem;
+}
+
+
+/* ===== 見出し ===== */
+h1 {
+  font-size: 2.5rem;
+  margin: 0 0 1.2em;
+  color: #0f172a;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0.4em;
+}
+
+h2 {
+  margin-top: 3em;
+  margin-bottom: 1em;
+  padding-left: 12px;
+  border-left: 6px solid #2563eb;
+  font-size: 1.7rem;
+  color: #1e3a8a;
+  scroll-margin-top: 72px;
+}
+
+h3 {
+  margin-top: 2.2em;
+  margin-bottom: 0.8em;
+  font-size: 1.35rem;
+  color: #0f766e;
+}
+
+/* ===== 段落 ===== */
+p {
+  margin: 1.1em 0;
+  color: #1f2937;
+}
+
+/* ===== フッター ===== */
+.footer {
+  margin: 64px 0 32px;
+  padding-top: 16px;
+  border-top: 1px solid #e1e1e1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.footer-link {
+  color: #1f6feb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footer-link:hover {
+  text-decoration: underline;
+}
+
+.footer-text {
+  margin: 0;
+}
+
+/* ===== リスト ===== */
+ul, ol {
+  margin: 1em 0 1em 1.5em;
+  color: #0f172a;
+}
+
+ul li::marker {
+  color: #2563eb;
+}
+
+ol li::marker {
+  color: #0f766e;
+}
+
+/* ===== コード ===== */
+pre {
+  margin: 1.8em 0;
+  padding: 18px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 1.05rem;
+}
+
+.code-wrapper {
+  position: relative;
+}
+
+.code-copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border: 1px solid #d0d7de;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #24292f;
+  z-index: 2;
+}
+
+.code-copy-btn:hover {
+  background: #f0f3f6;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #0f172a;
+}
+
+pre code {
+  color: #0f172a;
+}
+
+a {
+  color: #1d4ed8;
+}
+
+a:hover {
+  color: #1e40af;
+}
+
+details {
+  margin: 0.8em 0 1.6em;
+  padding: 0.6em 0.8em;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #0f766e;
+}
+
+.column {
+  margin: 1.4em 0;
+  padding: 0.9em 1.1em;
+  border-left: 6px solid #f59e0b;
+  background: #fff7ed;
+  border-radius: 6px;
+}
+
+.column-title {
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 0.4em;
+}
+
+.column-note {
+  color: #1f2937;
+}
+
+.markdown-body span.masked {
+  font-weight: bold;
+  color: transparent;
+  background-color: #fff57c;
+  padding: 0.05em 0.5em 0.05em 0.3em;
+  border-radius: 8px;
+  border: solid 2px #fff57c;
+  cursor: pointer;
+}
+
+.markdown-body span.masked.revealed {
+  color: #111827;
+  background-color: #e0f2fe;
+  border-color: #93c5fd;
+}
+
+.markdown-body ul {
+  list-style: none;
+  padding: 0;
+  margin-block-start: 0.7em;
+  margin-block-end: 0.7em;
+  margin: 0 0 0.7em 0;
+}
+
+.markdown-body ul li {
+  position: relative;
+  padding: 0.35em 0 0 1.3em;
+  margin: 0;
+  text-indent: 0.5em;
+}
+
+.highlight {
+  background: #fff3bf;
+  padding: 0.05em 0.2em;
+  border-radius: 4px;
+}
+
+/* ===== レスポンシブ対応 ===== */
+@media (max-width: 768px) {
+  .content {
+    margin: 32px auto;
+    padding: 0 16px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+  }
+
+  body {
+    line-height: 1.7;
+  }
+}
+
+/* ===== コミット ===== */
