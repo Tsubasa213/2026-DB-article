@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
   <link rel="stylesheet" href="style.css">
   <title>Point In Time Recoveryの実践</title>
 </head>
@@ -19,7 +20,7 @@
 この講義では<span class="highlight">SQL実行</span>、<span class="highlight">トランザクション</span>、<span class="highlight">結合</span>、<span class="highlight">バックアップ/リストア</span>の基礎を理解している前提で解説する。
 </p>
 <p>
-学習ゴールは次の3つ：①<span class="highlight">PITRの構成要素</span>を説明できる、②演習環境で<span class="highlight">PITRを再現</span>できる、③失敗時に原因を切り分けられる。手を動かすハンズオンと、定着確認・SQLドリルで最低90分以上の学習体験になる分量で進める。
+学習ゴールは次の3つ：①<span class="highlight-strong">PITRの構成要素</span>を説明できる、②演習環境で<span class="highlight-strong">PITRを再現</span>できる、③失敗時に原因を切り分けられる。手を動かすハンズオンと、定着確認・SQLドリルで最低90分以上の学習体験になる分量で進める。
 </p>
 
 <h2>2. 演習環境の前提（共通設定の確認）</h2>
@@ -36,9 +37,178 @@
 <a href="https://takeshiwada1980.github.io/DB-2025/lecture12.html#%E3%83%90%E3%83%83%E3%82%AF%E3%82%A2%E3%83%83%E3%83%97%E3%81%A8%E3%83%AA%E3%82%B9%E3%83%88%E3%82%A2">第12回講義（バックアップとリストア）</a>
 </p>
 
+<h3>2.1 バックアップ/リストアの復習（要点だけ）</h3>
+<p>
+PITRの前に、基本のバックアップ/リストアを整理しておく。ここでは<strong>論理バックアップ</strong>（SQLとして取り出す方式）を中心に復習する。
+</p>
+<ul>
+  <li><span class="highlight">目的</span>：壊したときに「安全に戻せる」状態を作る</li>
+  <li><span class="highlight">粒度</span>：DB全体 / スキーマ / テーブル単位で取得できる</li>
+  <li><span class="highlight">基本思想</span>：バックアップは「取りっぱなし」ではなく、リストアできることが重要</li>
+</ul>
+
+<h4>用語の意味（ここだけは押さえる）</h4>
+<p>
+<span class="highlight">バックアップ</span>は「今のデータを安全な場所に複製して保存すること」。
+<span class="highlight">リストア</span>は「バックアップからデータを戻し、元の状態に復元すること」。
+言い換えると、バックアップは“保険を作る”、リストアは“保険を使って元に戻す”。
+</p>
+
+<h4>バックアップの種類（論理/物理）</h4>
+<p>
+バックアップには大きく<strong>論理バックアップ</strong>と<strong>物理バックアップ</strong>がある。
+PITRは物理バックアップ（ベースバックアップ）とWALの組み合わせが前提になるため、
+論理だけでなく物理の特徴も理解しておく必要がある。
+</p>
+<ul>
+  <li><span class="highlight">論理バックアップ</span>：SQLとして取り出す（pg_dump）。<strong>可搬性が高い</strong>が、復元に時間がかかる。</li>
+  <li><span class="highlight">物理バックアップ</span>：DBファイルを丸ごと複製（pg_basebackup）。<strong>復旧が速い</strong>が、同一バージョン前提。</li>
+</ul>
+
+<h4>論理バックアップの形式と使い分け</h4>
+<p>
+pg_dump の出力形式は用途で選ぶ。SQL形式は人が読めるがサイズが大きくなりやすい。
+カスタム形式は圧縮・並列復元に向いている。
+</p>
+<pre><code class="language-bash">
+# 例: SQL形式（人が読める／差分比較しやすい）
+pg_dump -d mydb -f backup.sql
+
+# 例: カスタム形式（圧縮され、pg_restore で柔軟に復元）
+pg_dump -d mydb -F c -f backup.dump
+</code></pre>
+<ul>
+  <li>SQL形式：小規模DBや学習用途に向く</li>
+  <li>カスタム形式：本番運用での標準的な選択肢</li>
+</ul>
+
+<h4>論理バックアップの細かい粒度</h4>
+<p>
+pg_dumpはDB全体だけでなく、スキーマやテーブル単位で切り出せる。
+障害対応で「一部だけ戻したい」状況に強い。
+</p>
+<pre><code class="language-bash">
+# スキーマ単位
+pg_dump -d mydb -n public -f public.sql
+
+# テーブル単位
+pg_dump -d mydb -t orders -f orders.sql
+</code></pre>
+
+<h4>リストアの基本パターン（SQL/カスタム）</h4>
+<p>
+復元は「どこに戻すか（接続先）」と「どの形式か（SQL/カスタム）」が最重要。
+SQLはpsqlで流し込み、カスタム形式はpg_restoreを使う。
+</p>
+<pre><code class="language-bash">
+# SQL形式の復元
+psql -d mydb -f backup.sql
+
+# カスタム形式の復元（必要なテーブルだけ指定も可）
+pg_restore -d mydb -t orders backup.dump
+</code></pre>
+
+<h4>復元前の準備チェック（最低限の確認）</h4>
+<ul>
+  <li><span class="highlight">接続先の明示</span>：ホスト/ポート/DB名を明確にして誤爆を防ぐ</li>
+  <li><span class="highlight">権限の整備</span>：オーナー/ロールの差分で失敗しやすい</li>
+  <li><span class="highlight">空のDBを用意</span>：上書き事故を避けるため新規DBへ戻す</li>
+</ul>
+
+<h4>復元後の検証（必ずやる）</h4>
+<p>
+復元したら「戻ったこと」を確認する。件数・主要テーブル・インデックスの有無を確認するだけでも、
+失敗の早期発見に繋がる。
+</p>
+<pre><code class="language-sql">
+-- 件数確認（例）
+SELECT COUNT(*) FROM orders;
+
+-- 主要テーブルの存在確認
+\dt
+</code></pre>
+
+<h4>バックアップの保存戦略（世代管理）</h4>
+<p>
+バックアップは1世代だけだと「壊れたバックアップ」しか残らない可能性がある。
+世代管理と保管先分離でリスクを下げる。
+</p>
+<ul>
+  <li>複数世代を保持（例：日次×7、週次×4）</li>
+  <li>本番と同一ディスクには置かない</li>
+  <li>バックアップの暗号化・アクセス制御を徹底</li>
+</ul>
+
+<h4>自動化の第一歩（最低限の定期化）</h4>
+<p>
+手動運用は抜けが起きる。まずは定期実行とログ保存だけでも導入すると、
+「やったか分からない」問題がなくなる。
+</p>
+<pre><code class="language-bash">
+# 例: ダンプの実行ログを残す（概念例）
+pg_dump -d mydb -F c -f /backup/dumps/mydb_20260129.dump \
+  &gt; /backup/logs/backup_20260129.log 2&gt;&amp;1
+</code></pre>
+
+<h4>よくある疑問：論理バックアップだけで十分？</h4>
+<p>
+論理バックアップは「その時点」への復元には強いが、<span class="highlight">時点指定の復旧</span>はできない。
+PITRを行うには<strong>物理バックアップ + WAL</strong>が必須である。
+</p>
+
+<h4>論理バックアップの代表例</h4>
+<p>
+よく使うのは <span class="highlight">pg_dump</span> と <span class="highlight">pg_restore</span>。SQLまたはカスタム形式で保存し、必要に応じて復元する。
+</p>
+<pre><code class="language-bash">
+# 例: 単一DBをダンプ（SQL形式）
+pg_dump -d mydb -f backup.sql
+
+# 例: SQLを流し込んで復元
+psql -d mydb -f backup.sql
+</code></pre>
+
+<h4>復元の時に起きやすいポイント</h4>
+<ul>
+  <li>接続先が間違っていないか（誤って本番へ流さない）</li>
+  <li>権限やオーナーの違いで失敗することがある</li>
+  <li>復元後の整合性チェック（件数、主要テーブルの確認）は必須</li>
+</ul>
+
+<div class="column">
+  <div class="column-title">復習のまとめ</div>
+  <p class="column-note">
+  「バックアップは取得よりも<strong>復元が成功するか</strong>が重要」。
+  PITRはこの“復元”をさらに細かい時点で行う技術だと捉えると理解しやすい。
+  </p>
+</div>
+
+<h4>よくない例（やりがちな失敗）</h4>
+<ul>
+  <li>バックアップを取るだけで、<span class="highlight">復元テストをしていない</span></li>
+  <li>取得先が同じディスクで、障害時に<span class="highlight">同時に失われる</span></li>
+  <li>本番データをそのまま持ち出し、<span class="highlight">マスキングや権限分離をしない</span></li>
+  <li>運用ルールが曖昧で、<span class="highlight">誰がいつ復元するか不明</span></li>
+</ul>
+
+<h4>こういうケースもある（例外・現場対応）</h4>
+<ul>
+  <li>巨大DBでは、まず<span class="highlight">スキーマだけ復元</span>して動作確認する</li>
+  <li>アプリの都合で、<span class="highlight">特定テーブルだけ先に戻す</span>必要がある</li>
+  <li>監査対応で、<span class="highlight">復元ログの保存</span>が必須になる</li>
+  <li>復元先は本番ではなく、<span class="highlight">検証環境で手順を固めてから</span>本番に適用</li>
+</ul>
+
+<h4>運用の現実（小さな工夫が効く）</h4>
+<ul>
+  <li>復元時間が長いなら、<span class="highlight">バックアップ世代の間隔</span>を見直す</li>
+  <li>失敗原因は大抵「<span class="highlight">権限・接続先・ファイルパス</span>」のどれか</li>
+  <li>手順は短く書くより、<span class="highlight">やること・やらないこと</span>を明示する</li>
+</ul>
+
 <h2>3. PITRの全体像（深く理解する）</h2>
 <p>
-PITRは「<span class="highlight">ベースバックアップ</span> + <span class="highlight">WALアーカイブ</span> + <span class="highlight">復旧設定</span>」の組み合わせで成立する。ベースバックアップはある時点の完全コピー、WALはそれ以降の更新履歴。復旧時に「どこまで戻すか（時点）」を指定する。
+PITRは「<span class="highlight-strong">ベースバックアップ</span> + <span class="highlight-strong">WALアーカイブ</span> + <span class="highlight-strong">復旧設定</span>」の組み合わせで成立する。ベースバックアップはある時点の完全コピー、WALはそれ以降の更新履歴。復旧時に「どこまで戻すか（時点）」を指定する。
 </p>
 <ul>
   <li>ベースバックアップ：DB全体のスナップショット</li>
@@ -48,8 +218,11 @@ PITRは「<span class="highlight">ベースバックアップ</span> + <span cla
 
 <h3>3.1 PITRを使う利点（なぜ必要か）</h3>
 <p>
-PITRの最大の利点は「<span class="highlight">特定時点への巻き戻し</span>」ができることだ。たとえば誤ってテーブルを削除した場合でも、削除直前の時点に復旧できる。
+PITRの最大の利点は「<span class="highlight-strong">特定時点への巻き戻し</span>」ができることだ。たとえば誤ってテーブルを削除した場合でも、削除直前の時点に復旧できる。
 これは単純なダンプ復元だけでは再現できない、時点指定の復旧という強みになる。
+</p>
+<p>
+ただし「PITRがあるから安心」と思って<span class="highlight-strong">基本のバックアップをサボるのはNG</span>。PITRはベースバックアップがなければ成立しない。
 </p>
 <ul>
   <li>誤操作（DROP/UPDATE/DELETE）の直前に戻せる</li>
@@ -69,6 +242,9 @@ PITRの最大の利点は「<span class="highlight">特定時点への巻き戻�
 <p>
 WALは「<span class="highlight">先にログを書いてから実データを更新する</span>」仕組み。これにより、障害発生時でもログを再生すれば同じ状態を再現できる。
 PITRはこのWALを時系列で適用し、指定時刻で止めることで「その時点のDB」を作る。
+</p>
+<p>
+よくある誤解として「WALが全部残っていればいつでも戻れる」と思いがちだが、<span class="highlight">WALだけでは復旧できない</span>点に注意。
 </p>
 <ul>
   <li>WALは更新の順番を保証する</li>
@@ -91,8 +267,11 @@ PITRはこのWALを時系列で適用し、指定時刻で止めることで「�
 
 <h3>3.3 ベースバックアップの役割（起点の重要性）</h3>
 <p>
-WALだけでは復旧できない。必ず「<span class="highlight">起点となるスナップショット</span>（ベースバックアップ）」が必要になる。
+WALだけでは復旧できない。必ず「<span class="highlight-strong">起点となるスナップショット</span>（ベースバックアップ）」が必要になる。
 たとえば、WALは「差分」なので、どこかの時点の完全コピーがないと復元先が存在しない。
+</p>
+<p>
+現場では「ベースバックアップが古すぎて復旧が長引く」ケースもあるので、<span class="highlight">取得間隔の見直し</span>が重要。
 </p>
 
 <h3>3.4 復旧ターゲットの種類</h3>
@@ -126,7 +305,7 @@ PITRは「誤操作直前」など細かい時点に戻せる点が大きな違�
 
 <h3>3.6 運用での考え方（RPOとRTO）</h3>
 <p>
-PITRは運用設計とセットで考えると理解が深まる。<span class="highlight">RPO</span>（失ってよい最大時間）と<span class="highlight">RTO</span>（復旧に許される時間）を意識すると、
+PITRは運用設計とセットで考えると理解が深まる。<span class="highlight-strong">RPO</span>（失ってよい最大時間）と<span class="highlight-strong">RTO</span>（復旧に許される時間）を意識すると、
 どの頻度でバックアップし、どれだけWALを保存すべきか判断できる。
 </p>
 <ul>
@@ -189,7 +368,7 @@ VSCodeでDB-PostgreSQLを開き、ターミナルはそのフォルダを作業�
 まずはターミナルの作業場所とコンテナの起動状況を確認する。ここがズレると以降の作業が全部ずれるので、
 最初に丁寧に確認しておく。
 </p>
-<pre><code>
+<pre><code class="language-bash">
 # VSCodeでプロジェクトを開いた状態で実行（PowerShell想定）
 pwd
 </code></pre>
@@ -200,15 +379,15 @@ pwd
   まだコンテナが起動していない場合は、講義資料の手順に従って起動する。
   </p>
 </div>
-<pre><code>
+<pre><code class="language-bash">
 # Dockerコンテナ起動（講義資料の手順）
 npm run db:up
 </code></pre>
-<pre><code>
+<pre><code class="language-bash">
 # 起動確認（例）
 docker ps
 </code></pre>
-<pre><code>
+<pre><code class="language-bash">
 mkdir -p /backup/base
 mkdir -p /backup/wal_archive
 </code></pre>
@@ -218,22 +397,25 @@ mkdir -p /backup/wal_archive
 まずは現在の設定を確認する。設定ファイルを直接編集する場合は、操作権限と再起動が必要になるので注意する。
 </p>
 <p>
+設定を変える前に、<span class="highlight">今の値を控える</span>のは必須。戻せなくなると原因調査が詰む。
+</p>
+<p>
 SQLの実行は、講義資料どおりに <span class="highlight">VSCodeのタスク実行（Ctrl+Shift+B）</span> または
 <span class="highlight">ターミナルからnpm run sql</span> を使う。以下はターミナル実行の例。
 </p>
-<pre><code>
+<pre><code class="language-bash">
 # 例: 一時ファイルを作ってSQLを実行
 code sql/tmp_pitr.sql
 npm run sql sql/tmp_pitr.sql
 </code></pre>
-<pre><code>
+<pre><code class="language-sql">
 SHOW archive_mode;
 SHOW archive_command;
 SHOW wal_level;
 </code></pre>
 
 <p>postgresql.conf の代表的な設定例（環境に合わせて調整）。</p>
-<pre><code>
+<pre><code class="language-ini">
 archive_mode = on
 archive_command = 'test ! -f /backup/wal_archive/%f &amp;&amp; cp %p /backup/wal_archive/%f'
 wal_level = replica
@@ -254,7 +436,7 @@ wal_level = replica
 
 <h3>4.3 ベースバックアップの取得</h3>
 <p>ベースバックアップは復旧の起点になる。まずは取得しておく。</p>
-<pre><code>
+<pre><code class="language-bash">
 pg_basebackup -D /backup/base -Fp -Xs -P
 </code></pre>
 <p>
@@ -263,7 +445,7 @@ pg_basebackup -D /backup/base -Fp -Xs -P
 
 <h3>4.4 WAL生成とアーカイブ確認</h3>
 <h4>4.4.1 テスト用テーブル作成</h4>
-<pre><code>
+<pre><code class="language-sql">
 CREATE TABLE pitr_demo (
   id SERIAL PRIMARY KEY,
   message TEXT NOT NULL,
@@ -272,7 +454,7 @@ CREATE TABLE pitr_demo (
 </code></pre>
 
 <h4>4.4.2 変更を発生させる</h4>
-<pre><code>
+<pre><code class="language-sql">
 INSERT INTO pitr_demo (message) VALUES
   ('first'),
   ('second'),
@@ -280,46 +462,49 @@ INSERT INTO pitr_demo (message) VALUES
 </code></pre>
 
 <h4>4.4.3 WALアーカイブの生成を促す</h4>
-<pre><code>
+<pre><code class="language-sql">
 SELECT pg_switch_wal();
 </code></pre>
 
 <h4>4.4.4 アーカイブ確認</h4>
-<pre><code>
+<pre><code class="language-bash">
 ls -la /backup/wal_archive
 </code></pre>
 
 <h3>4.5 障害発生の再現</h3>
 <p>削除直前の時刻を記録しておく（復旧ターゲットになる）。</p>
-<pre><code>
+<pre><code class="language-sql">
 SELECT now();
 SELECT * FROM pitr_demo ORDER BY id;
 </code></pre>
 
 <p>誤操作（削除）を実行。</p>
-<pre><code>
+<pre><code class="language-sql">
 DROP TABLE pitr_demo;
 </code></pre>
 
 <h3>4.6 PITRによる復旧</h3>
 <h4>4.6.1 目標時刻の設定</h4>
 <p>削除直前の時刻をメモして、その時刻へ復旧する。</p>
-<pre><code>
+<pre><code class="language-ini">
 recovery_target_time = '2026-01-27 10:30:00'
 </code></pre>
 
 <h4>4.6.2 リストア用の基本設定</h4>
-<pre><code>
+<pre><code class="language-ini">
 restore_command = 'cp /backup/wal_archive/%f %p'
 </code></pre>
+<p>
+ここでパスを間違えると、<span class="highlight">無言で復旧が進まない</span>ことがある。ログ確認はセット。
+</p>
 
 <h4>4.6.3 復旧シグナルの用意</h4>
-<pre><code>
+<pre><code class="language-bash">
 touch recovery.signal
 </code></pre>
 
 <h4>4.6.4 復旧後の確認</h4>
-<pre><code>
+<pre><code class="language-sql">
 SELECT * FROM pitr_demo ORDER BY id;
 </code></pre>
 
@@ -330,6 +515,7 @@ SELECT * FROM pitr_demo ORDER BY id;
   <li>recovery_target_time の形式ミス</li>
   <li>ベースバックアップ取得後にWALが欠落している</li>
   <li>復旧後の起動が終了しない（ターゲット時刻未到達）</li>
+  <li>復旧後にアプリが動かない（<span class="highlight">接続先が旧DBのまま</span>）</li>
 </ul>
 
 <h2>6. 定着確認</h2>
@@ -363,7 +549,7 @@ SELECT * FROM pitr_demo ORDER BY id;
 論理削除済みキャラは除外し、<span class="highlight">transferred_at</span> は 2026-01-01 04:00:00 とする。
 </p>
 <p><span class="highlight">ヒント</span>：乱数生成（第09回講義）、`FLOOR(RANDOM() * n)`、`DATE/TIMESTAMP` の扱い。</p>
-<pre><code>
+<pre><code class="language-sql">
 -- 期待する出力イメージ（例）
 --    id    | from  |   to    |  amount  |   transferred_at
 -- ---------+-------+---------+----------+---------------------
@@ -379,7 +565,7 @@ SELECT * FROM pitr_demo ORDER BY id;
 transferred_at は 2025-12-15 04:00:00 固定とする。
 </p>
 <p><span class="highlight">ヒント</span>：x_guilds、x_guild_characters、x_characters の結合、オーナーIDの取得。</p>
-<pre><code>
+<pre><code class="language-sql">
 -- 期待する出力イメージ（例）
 --    id    |  from  |   to   |  amount  |   transferred_at
 -- ---------+--------+--------+----------+---------------------
@@ -394,7 +580,7 @@ transferred_at は 2025-12-15 04:00:00 固定とする。
 論理削除済みのキャラも含める。<span class="highlight">transferred_at は created_at の5分後</span>にすること。
 </p>
 <p><span class="highlight">ヒント</span>：`INTERVAL` の加算、TIMESTAMP演算。</p>
-<pre><code>
+<pre><code class="language-sql">
 -- 期待する出力イメージ（例）
 --    id    | from  |   to    |  amount  |   transferred_at
 -- ---------+-------+---------+----------+---------------------
@@ -407,4 +593,10 @@ transferred_at は 2025-12-15 04:00:00 固定とする。
 
 </body>
 <script src="main.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </html>
+
+
+
+<!-- https://qiita.com/yaju/items/51e7b1037a99856e547c　めも -->
