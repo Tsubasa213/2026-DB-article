@@ -380,7 +380,22 @@ PITRはこの状況で最短復旧を実現するための選択肢になる。
   「PITRの流れを『時系列の出来事』として説明してください。1分で読める長さで。」
   </p>
 </div>
-
+<h3>3.10 時刻特定の手法（自動ログと手動記録）</h3>
+<p>
+PITRで最も難しいのは「何時何分何秒に戻すべきか」を特定することです。これには主に2つの自動ログが活用されます。
+</p>
+<div class="column">
+  <div class="column-title">1. データベースによる実行ログ（postgresql.log）</div>
+  <p class="column-note">
+    PostgreSQLの設定で <code>log_statement = 'all'</code> が有効な場合、実行されたすべてのSQLとその時刻がログファイルに自動記録されます。実務ではこのログから「誤操作が行われた正確な時刻」を特定します。
+  </p>
+</div>
+<div class="column">
+  <div class="column-title">2. テーブル設計による自動タイムスタンプ</div>
+  <p class="column-note">
+    今回の演習で使用する <code>x_gold_transfers</code> には、データ挿入時に自動で時刻を記録する <code>transferred_at</code> カラムが定義されています。このように、データそのものに「いつ作られたか」が自動で刻まれる設計にしておくことも、復旧時の重要な手がかりとなります。
+  </p>
+</div>
 <h2>4. ハンズオン学習</h2>
 <h3>4.1 作業用ディレクトリの準備</h3>
 <p>バックアップ先とアーカイブ先を明示的に作成する。</p>
@@ -639,66 +654,196 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
 
 <h2>7. SQLドリル / 演習</h2>
 <p>
-ここからは <span class="highlight">x_**** テーブル群</span>を使った実務寄りのSQLドリル。必ず <span class="highlight">START TRANSACTION</span> と <span class="highlight">ROLLBACK</span> で囲んで実行すること。
+本演習では、第10回講義などで構築した <code>x_characters</code> や <code>x_gold_transfers</code> テーブルを使用します。
+単にクエリを書くだけでなく、あえて誤ったコードを確定（COMMIT）させ、その後にPITRを用いて正常な状態へ戻すプロセスを体験します。
 </p>
 
-<h3>7.1 PITR演習：誤操作の時刻特定と1分前復旧</h3>
-<p>
-PITRそのものを評価する演習として、以下の流れを完遂する。
-</p>
-<ol>
-  <li>対象テーブルの更新前時刻を <span class="highlight">SELECT now()</span> で記録</li>
-  <li>誤操作を実行。例: DROP TABLE / DELETE</li>
-  <li>ログまたはメモした時刻から <span class="highlight">1分前</span>を復旧ターゲットに設定</li>
-  <li>PITRを実施して、更新前の状態に戻ることを確認</li>
-</ol>
-<p>
-評価ポイント：<span class="highlight">時刻の特定 → 設定反映 → 復旧 → 確認</span>までの一連操作ができること。
-</p>
+<div class="column">
+  <div class="column-title">演習環境の再構築</div>
+  <p class="column-note">
+    演習の結果、テーブル構造や初期データが不明になった場合は、
+    <code>from-teacher/10/create-x_db.sql</code> を実行して環境を初期状態にリセットしてください。
+    このスクリプトにより、キャラクター情報やギルド所属情報が正しく再生成されます。
+  </p>
+</div>
 
-<h3>ex-03_1：年始の一斉支給</h3>
-<p><span class="highlight">難易度：★★★</span></p>
+<div class="column">
+  <div class="column-title">時刻特定とログの仕組み</div>
+  <p class="column-note">
+    PITRで最も重要な「復旧時刻」の特定には、主に2つの方法があります。
+    一つはデータベースの実行ログ（postgresql.log）を確認する方法で、設定により実行されたSQLと時刻が自動記録されます。
+    もう一つは、<code>x_gold_transfers</code> の <code>transferred_at</code> カラムのように、データ自体に自動付与されるタイムスタンプを参照する方法です。
+    本演習では <code>SELECT now();</code> を用いて手動で時刻をメモしますが、実務ではこれらの自動ログが頼りになります。
+  </p>
+</div>
+
+<h3>ex-03_1：条件指定漏れによる全キャラクターの所持金更新</h3>
 <p>
-新年イベントとして、運営から全キャラへ 25,000G〜45,000G を 1,000G 刻みのランダム値で支給する送金レコードを <span class="highlight">x_gold_transfers</span> に挿入せよ。
-論理削除済みキャラは除外し、<span class="highlight">transferred_at</span> は 2026-01-01 04:00:00 とする。
+特定のキャラクターのゴールドを調整するつもりが、WHERE句を書き忘れたために、全キャラクターのゴールドを0に更新して確定させてしまったケースを再現します。
 </p>
-<p><span class="highlight">ヒント</span>：乱数生成、第09回講義、`FLOOR(RANDOM() * n)`、`DATE/TIMESTAMP` の扱い。</p>
+<div class="column">
+  <div class="column-title">ステップ1：誤操作の実行</div>
+  <p class="column-note">まず現在時刻をメモし、以下のコードを実行・確定してください。</p>
 <pre><code class="language-sql">
--- 期待する出力イメージ
---    id    | from  |   to    |  amount  |   transferred_at
--- ---------+-------+---------+----------+---------------------
---  xxxxxxxx | _SYS_ | Marvin  |   30,000 | 2026-01-01 04:00:00
---  xxxxxxxx | _SYS_ | Zach    |   38,000 | 2026-01-01 04:00:00
-</code></pre>
+-- 現在時刻をメモ
+SELECT now();
 
-<h3>ex-03_2：ギルド共益費の自動徴収</h3>
-<p><span class="highlight">難易度：★★★★</span></p>
-<p>
-各ギルドで、メンバからオーナーへ「共益費」2,000Gを支払う送金レコードを作成せよ。
-<span class="highlight">論理削除済みキャラは除外</span>し、オーナー本人は自分のギルドへ支払わない。
-transferred_at は 2025-12-15 04:00:00 固定とする。
-</p>
-<p><span class="highlight">ヒント</span>：x_guilds、x_guild_characters、x_characters の結合、オーナーIDの取得。</p>
-<pre><code class="language-sql">
--- 期待する出力イメージ
---    id    |  from  |   to   |  amount  |   transferred_at
--- ---------+--------+--------+----------+---------------------
---  xxxxxxxx | Alice  | Marvin |    2,000 | 2025-12-15 04:00:00
---  xxxxxxxx | Oscar  | Bob    |    2,000 | 2025-12-15 04:00:00
+BEGIN;
+UPDATE x_characters SET gold = 0; 
+COMMIT;
 </code></pre>
+</div>
+<div class="column">
+  <div class="column-title">ステップ2：リカバリ課題</div>
+  <p class="column-note">
+    メモした時刻をターゲットにPITRを行い、キャラクターのゴールドが初期値（例：Marvinは50,000G）に戻っているか確認してください。
+  </p>
+</div>
 
-<h3>ex-03_3：新規作成キャラへの初期資金配布</h3>
-<p><span class="highlight">難易度：★★★</span></p>
+<hr>
+
+<h3>ex-03_2：報酬配布スクリプトの二重実行</h3>
 <p>
-運営から各キャラへ 1,000G を支給する送金レコードを作成せよ。
-論理削除済みのキャラも含める。<span class="highlight">transferred_at は created_at の5分後</span>にすること。
+配布スクリプトを誤って2回連続で実行したために、送金履歴テーブルに重複したレコードが記録されてしまったケースを再現します。
 </p>
-<p><span class="highlight">ヒント</span>：`INTERVAL` の加算、TIMESTAMP演算。</p>
+<div class="column">
+  <div class="column-title">ステップ1：重複データの発生</div>
+  <p class="column-note">以下の配布処理を<strong>2回</strong>実行し、COMMITしてください。1回目と2回目の間の時刻を特定する必要があります。</p>
 <pre><code class="language-sql">
--- 期待する出力イメージ
---    id    | from  |   to    |  amount  |   transferred_at
--- ---------+-------+---------+----------+---------------------
+BEGIN;
+INSERT INTO x_gold_transfers (from_character_id, to_character_id, amount, transferred_at)
+SELECT '_SYS_', id, 10000, now() FROM x_characters WHERE deleted_at IS NULL;
+COMMIT;
 </code></pre>
+</div>
+<div class="column">
+  <div class="column-title">ステップ2：リカバリ課題</div>
+  <p class="column-note">
+    1回目の実行は正当な配布とし、2回目の実行が行われる直前の時刻まで巻き戻して、重複を解消してください。
+  </p>
+</div>
+
+<hr>
+
+<h3>ex-03_3：物理削除事故</h3>
+<p>
+本来は論理削除（deleted_atの更新）をすべきところを、誤って物理削除（DELETE）を実行し、ギルド所属情報を消去してしまったケースを再現します。
+</p>
+<div class="column">
+  <div class="column-title">ステップ1：物理削除の実行</div>
+<pre><code class="language-sql">
+-- 実行前の時刻をメモ
+SELECT now();
+
+BEGIN;
+DELETE FROM x_guild_characters WHERE character_id = 'C001'; 
+COMMIT;
+</code></pre>
+</div>
+<div class="column">
+  <div class="column-title">ステップ2：リカバリ課題</div>
+  <p class="column-note">
+    物理削除されたレコードはROLLBACKでは戻せません。PITRを行い、対象の所属レコードを復活させてください。
+  </p>
+</div>
+
+<hr>
+
+<h3>ex-03_4：本番テーブルの誤削除</h3>
+<p>
+作業用テーブルを削除するつもりが、誤って <code>x_guilds</code> テーブルそのものを削除してしまったケースを想定します。
+</p>
+<div class="column">
+  <div class="column-title">リカバリ課題</div>
+  <p class="column-note">
+    <code>DROP TABLE x_guilds;</code> を実行した後、PITRによってテーブル構造とデータの両方を復旧させてください。
+  </p>
+</div>
+
+<hr>
+
+<h3>ex-03_5：一斉昇級処理のロジックエラー</h3>
+<p>
+全キャラクターのゴールドを1.1倍（10%増）にするつもりが、誤って <code>gold * 10</code> （10倍）にして確定してしまったケースを再現します。
+</p>
+<div class="column">
+  <div class="column-title">ステップ1：誤った一斉更新</div>
+<pre><code class="language-sql">
+BEGIN;
+UPDATE x_characters SET gold = gold * 10;
+COMMIT;
+</code></pre>
+</div>
+<div class="column">
+  <div class="column-title">ステップ2：リカバリ課題</div>
+  <p class="column-note">
+    経済バランスが壊れた状態から、実行数秒前の時刻を指定して元のゴールド量へ巻き戻してください。
+  </p>
+</div>
+
+<hr>
+
+<h3>ex-03_6：ギルド解散処理の誤適用</h3>
+<p>
+特定のギルドのメンバーを脱退させるつもりが、条件指定のミスで全ギルドの所属情報を削除してしまったケースを想定します。
+</p>
+<div class="column">
+  <div class="column-title">リカバリ課題</div>
+  <p class="column-note">
+    <code>DELETE FROM x_guild_characters;</code> を実行・確定した後、削除直前の時刻を特定し、全メンバーの所属状況を復元してください。
+  </p>
+</div>
+
+<h2>8. 演習の解答例</h2>
+<p>各演習に共通する標準的なリカバリ手順の考え方です。時刻やパスは各自の環境に合わせて調整してください。</p>
+
+<details>
+<summary>共通リカバリ・テンプレート</summary>
+<div class="column">
+  <div class="column-title">リカバリ用パラメータ設定</div>
+  <p class="column-note">
+    postgresql.auto.conf への反映例です。時刻やパスは各自の環境に合わせて書き換えてください。
+  </p>
+  <pre><code class="language-bash">
+# パラメータの記述例
+docker exec -it db-postgres bash -c "echo \"restore_command = 'cp /backup/wal_archive/%f %p'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = '2026-02-16 10:00:00'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker exec -it db-postgres bash -c "echo \"recovery_target_timeline = 'latest'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker exec -it db-postgres bash -c "echo \"recovery_target_action = 'promote'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+  </code></pre>
+</div>
+
+<div class="column">
+  <div class="column-title">復旧後の確認と再開用SQL</div>
+  <p class="column-note">
+    リカバリ完了後、データベースの状態を確認し、必要に応じて通常稼働へ移行させます。
+  </p>
+  <pre><code class="language-sql">
+-- リカバリ状態の確認（'t' であればリカバリモード中）
+SELECT pg_is_in_recovery();
+
+-- 最後に再生されたトランザクション時刻の確認
+SELECT pg_last_xact_replay_timestamp();
+
+-- 通常稼働へ移行（書き込みを許可する）
+SELECT pg_wal_replay_resume();
+  </code></pre>
+</div>
+</details>
+
+<hr>
+
+<h3>まとめと復習</h3>
+<p>
+今回の講義の要点を復習しましょう。黄色い部分をクリックすると正解が表示されます。
+</p>
+<ul>
+  <li>PITRを実現するには、ベースバックアップと <span class="masked">WALアーカイブ</span> の両方が必須である。</li>
+  <li>リカバリを開始するには、データディレクトリ内に <span class="masked">recovery.signal</span> という空ファイルを作成する。</li>
+  <li>復旧を止めたい特定の時刻は <span class="masked">recovery_target_time</span> パラメータで指定する。</li>
+  <li>リカバリ終了直後、DBは「一時停止」状態になるため、<span class="masked">pg_wal_replay_resume()</span> を実行して通常稼働へ移行させる必要がある。</li>
+  <li>物理的な破壊（DROP TABLEなど）は、通常の <span class="masked">ROLLBACK</span> では救済できないため、PITRが唯一の解決策となる。</li>
+</ul>
 
 <footer class="footer">
   <a class="footer-link" href="https://github.com/Tsubasa213" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -710,7 +855,6 @@ transferred_at は 2025-12-15 04:00:00 固定とする。
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
 </html>
-
 
 
 <!-- https://qiita.com/yaju/items/51e7b1037a99856e547c　めも -->
