@@ -57,7 +57,7 @@ PITRの前に、基本のバックアップ/リストアを整理します。こ
 <h4>バックアップの種類</h4>
 <p>
 バックアップには大きく<strong>論理バックアップ</strong>と<strong>物理バックアップ</strong>があります。
-PITRはベースバックアップとWALの組み合わせが前提です。
+PITRはベースバックアップとWAL（Write-Ahead Logging）の組み合わせが前提です。
 そのため、論理だけでなく物理バックアップの特徴も把握しておく必要があります。
 </p>
 <ul>
@@ -229,8 +229,8 @@ PITRは「<span class="highlight-strong">ベースバックアップ</span> + <s
 </p>
 <ul>
   <li>ベースバックアップ：DB全体のスナップショット</li>
-  <li>WALアーカイブ：更新履歴。Write-Ahead Logging</li>
-  <li>復旧設定：restore_command と recovery_target_time</li>
+  <li>WALアーカイブ：更新履歴を保管する</li>
+  <li>復旧設定：<code>restore_command</code> と <code>recovery_target_time</code></li>
 </ul>
 
 <h3>3.1 PITRを使う利点</h3>
@@ -241,7 +241,7 @@ PITRの利点は<span class="highlight-strong">特定時点への復旧</span>�
 PITRはベースバックアップがなければ成立しません。基本のバックアップは必須です。
 </p>
 <ul>
-  <li>誤操作の直前に戻せる。DROP/UPDATE/DELETE など</li>
+  <li>誤操作の直前に戻せる。<code>DROP</code>/<code>UPDATE</code>/<code>DELETE</code> など</li>
   <li>障害発生時の復旧範囲を最小化できる</li>
   <li>「バックアップはあるが直近データが必要」の状況に強い</li>
 </ul>
@@ -301,9 +301,9 @@ WALは差分情報のため、完全コピーがなければ復元できませ�
 PITRは時刻以外にも停止位置を指定できます。
 </p>
 <ul>
-  <li>recovery_target_time：時刻指定。直感的</li>
-  <li>recovery_target_lsn：LSN指定。より厳密</li>
-  <li>recovery_target_name：リカバリーポイント名指定</li>
+  <li><code>recovery_target_time</code>：時刻指定。直感的</li>
+  <li><code>recovery_target_lsn</code>：LSN指定。より厳密</li>
+  <li><code>recovery_target_name</code>：リカバリーポイント名指定</li>
 </ul>
 <div class="column">
   <div class="column-title">補足：LSNの定義</div>
@@ -324,13 +324,13 @@ Timeline 1: ----A----B----C----(誤操作)
 Timeline 2:               ----D----E----(復旧後の新しい履歴)
 </code></pre>
 <p>
-復旧設定に <span class="highlight">recovery_target_timeline = 'latest'</span> を明示して最新タイムラインを追従させる。
+復旧設定に <span class="highlight"><code>recovery_target_timeline = 'latest'</code></span> を明示して最新タイムラインを追従させる。
 </p>
 
 <div class="column">
-  <div class="column-title">補足：recovery_target_action の役割</div>
+  <div class="column-title">補足：<code>recovery_target_action</code> の役割</div>
   <p class="column-note">
-  recovery_target_action は「目標時刻に到達した後の動作」を決める。
+  <code>recovery_target_action</code> は「目標時刻に到達した後の動作」を決める。
   デフォルトは <span class="highlight">pause</span> で、読み取りはできても書き込みができない状態になる。
   書き込みを再開したい場合は <span class="highlight">promote</span> を指定するか、
   復旧後に <span class="highlight">SELECT pg_wal_replay_resume();</span> を実行して通常稼働へ移行します。
@@ -339,7 +339,7 @@ Timeline 2:               ----D----E----(復旧後の新しい履歴)
 <div class="column">
   <div class="column-title">参考質問例</div>
   <p class="column-note">
-  「PostgreSQLのLSNとは何を表す値かを説明し、`recovery_target_time` と比べたときにLSN指定が有利になる場面を1つ挙げてください。」
+  「PostgreSQLのLSNとは何を表す値かを説明し、<code>recovery_target_time</code> と比べたときにLSN指定が有利になる場面を1つ挙げてください。」
   </p>
 </div>
 
@@ -396,7 +396,7 @@ PITRはこの状況で最短復旧を実現するための選択肢になる。
   <li>WALアーカイブの保存先が満杯 → <span class="highlight">容量監視</span>とローテーションを設計する</li>
   <li>ベースバックアップの世代が古すぎる → <span class="highlight">定期取得</span>を必須化する</li>
   <li>復旧ターゲット時刻が未来 → <span class="highlight">ログ時刻と整合</span>をとる</li>
-  <li>復旧後に書き込みできない → <span class="highlight">recovery_target_action</span> と <span class="highlight">pg_wal_replay_resume()</span> を確認する</li>
+  <li>復旧後に書き込みできない → <span class="highlight"><code>recovery_target_action</code></span> と <span class="highlight"><code>pg_wal_replay_resume()</code></span> を確認する</li>
 </ul>
 
 <h3>3.9 時系列で見るPITR</h3>
@@ -410,7 +410,7 @@ PITRは「まず起点を用意し、次に更新履歴を順に再生し、最�
 <span class="time-a">時刻A</span>                    <span class="time-b">時刻B</span>(障害)
  |--------------------------|
  [ベースバックアップ]   [誤操作発生]
-         \n+      WALアーカイブ（A→B）を順に再生
+         WALアーカイブ（A→B）を順に再生
                           ^
                           |
                 復旧ターゲット（B直前）で停止
@@ -457,6 +457,48 @@ PITRで最も難しいのは「何時何分何秒に戻すべきか」を特定�
   </p>
 </div>
 <h2>4. ハンズオン学習</h2>
+<p>
+この章では「誤操作の直前時刻に戻せること」をゴールに、PITRの設定・復旧・確認までを一連で実施します。
+ここを先に読んでから手順を進めると、何を触っているかを見失いにくくなります。
+</p>
+
+<div class="column">
+  <div class="column-title">この章の目的</div>
+  <ul class="column-note">
+    <li>WALアーカイブ設定を有効化し、復旧可能な状態を作る。</li>
+    <li>誤操作（例: <code>DROP TABLE</code>）を再現し、<code>recovery_target_time</code> で巻き戻す。</li>
+    <li>復旧後に <code>pg_is_in_recovery()</code> などで状態確認し、通常稼働へ戻す。</li>
+  </ul>
+</div>
+
+<div class="column">
+  <div class="column-title">今から触るファイル</div>
+  <ul class="column-note">
+    <li><code>/var/lib/postgresql/data/postgresql.auto.conf</code>（復旧パラメータの追記先）</li>
+    <li><code>sql/tmp_pitr.sql</code>（手元で実行するSQLの一時ファイル）</li>
+    <li><code>from-teacher/10/create-x_db.sql</code>（演習環境を初期化する再構築用SQL）</li>
+  </ul>
+</div>
+
+<div class="column">
+  <div class="column-title">使用するテーブル</div>
+  <ul class="column-note">
+    <li><code>pitr_demo</code>（4章で作成するPITR確認用テーブル）</li>
+    <li><code>x_characters</code> / <code>x_gold_transfers</code> / <code>x_guild_characters</code> / <code>x_guilds</code>（6章のSQLドリルで利用）</li>
+    <li>状態が崩れた場合は <code>from-teacher/10/create-x_db.sql</code> で再構築する。</li>
+  </ul>
+</div>
+
+<div class="column">
+  <div class="column-title">実行の流れ（最短）</div>
+  <ol class="column-note">
+    <li>作業ディレクトリを <code>DB-PostgreSQL</code> に合わせ、<code>npm run db:up</code> で起動確認。</li>
+    <li><code>postgresql.auto.conf</code> に <code>restore_command</code> などを設定し再起動。</li>
+    <li>SQLは <code>npm run sql sql/tmp_pitr.sql</code> で実行し、時刻を記録して復旧ターゲットに使う。</li>
+    <li>復旧後は検証クエリで整合性確認し、必要に応じて通常稼働へ移行する。</li>
+  </ol>
+</div>
+
 <h3>4.1 作業用ディレクトリの準備</h3>
 <p>バックアップ先とアーカイブ先を明示的に作成します。</p>
 <p>
@@ -617,7 +659,7 @@ recovery_target_timeline = 'latest'
 recovery_target_action = 'promote'
 </code></pre>
 <p>
-<span class="highlight">recovery_target_action = 'promote'</span> を指定しない場合は pause になるので、
+<span class="highlight"><code>recovery_target_action = 'promote'</code></span> を指定しない場合は <code>pause</code> になるので、
 復旧後に書き込みができない状態になる。pauseのままにする場合は、
 復旧後に <span class="highlight">SELECT pg_wal_replay_resume();</span> を実行して通常稼働へ移行します。
 </p>
@@ -672,7 +714,7 @@ SELECT pg_last_xact_replay_timestamp();
 
 <h3>定着確認（第4章）</h3>
 <ul>
-  <li><code>restore_command</code> の設定ミスは<span class="masked">復旧停止</span>の原因になりやすい。</li>
+  <li><span class="masked">restore_command</span> の設定ミスは<span class="masked">復旧停止</span>の原因になりやすい。</li>
   <li>復旧手順では <span class="masked">設定反映 → recovery.signal作成 → 起動</span> の順序を守る。</li>
   <li>復旧状態の確認には <span class="masked">pg_is_in_recovery()</span> を使う。</li>
 </ul>
@@ -680,8 +722,8 @@ SELECT pg_last_xact_replay_timestamp();
 <h2>5. 注意点</h2>
 <ul>
   <li>アーカイブ先のパスと権限を確認する。</li>
-  <li>archive_command の成否をログで確認する。</li>
-  <li>recovery_target_time の形式を確認する。</li>
+  <li><code>archive_command</code> の成否をログで確認する。</li>
+  <li><code>recovery_target_time</code> の形式を確認する。</li>
   <li>ベースバックアップ取得後のWAL欠落有無を確認する。</li>
   <li>復旧後に起動が完了しない場合はターゲット時刻到達を確認する。</li>
   <li>復旧後にアプリが動かない場合は<span class="highlight">接続先が旧DBのまま</span>でないか確認する。</li>
@@ -692,7 +734,7 @@ SELECT pg_last_xact_replay_timestamp();
 「意図的な失敗」を組み込み、トラブルシューティングの手順を確認します。
 </p>
 <ol>
-  <li>restore_command のパスをわざと間違える</li>
+  <li><code>restore_command</code> のパスをわざと間違える</li>
   <li>起動後に <span class="highlight">復旧が進まない</span>ことを確認</li>
   <li><span class="highlight">docker logs db-postgres</span> でエラーを確認</li>
   <li>正しいパスに戻して復旧を再実行</li>
@@ -718,7 +760,7 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
 
 <h3>定着確認（第5章）</h3>
 <ul>
-  <li><code>archive_command</code> の異常時は <span class="masked">パス・権限・既存ファイル衝突・ログ</span> の順で確認する。</li>
+  <li><span class="masked">archive_command</span> の異常時は <span class="masked">パス・権限・既存ファイル衝突・ログ</span> の順で確認する。</li>
   <li>WAL削除前には <span class="masked">復旧可能範囲</span> を先に定義する。</li>
   <li>復旧後に不整合がある場合は <span class="masked">接続先誤りやWAL欠落</span> を疑う。</li>
 </ul>
@@ -932,7 +974,7 @@ SELECT pg_wal_replay_resume();
 </details>
 
 
-<p class="footer-text"><span class="highlight">制作時間：18時間</span></p>
+<p class="footer-text"><span class="highlight">制作時間：22時間</span></p>
 <footer class="footer">
   <a class="footer-link" href="https://github.com/Tsubasa213" target="_blank" rel="noopener noreferrer">GitHub</a>
   <p class="footer-text">© copyright 2026 Tsubasa213/つばさ all right resolved.</p>
