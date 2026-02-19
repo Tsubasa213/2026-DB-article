@@ -109,4 +109,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
     wrapper.appendChild(button);
   });
+
+  // DocsBot iframe の表示/非表示トグル
+  const docsbotFrame = document.querySelector(".docsbot-frame");
+  if (docsbotFrame instanceof HTMLIFrameElement) {
+    docsbotFrame.classList.add("is-hidden");
+
+    const toggleButton = document.createElement("button");
+    toggleButton.type = "button";
+    toggleButton.className = "docsbot-toggle-btn";
+    toggleButton.setAttribute("aria-label", "チャット表示");
+    toggleButton.innerHTML = '<i class="fa-solid fa-comment" aria-hidden="true"></i>';
+
+    const updateToggleLabel = () => {
+      const isHidden = docsbotFrame.classList.contains("is-hidden");
+      toggleButton.setAttribute("aria-label", isHidden ? "チャット表示" : "チャット非表示");
+      toggleButton.title = isHidden ? "チャット表示" : "チャット非表示";
+      toggleButton.classList.toggle("is-chat-hidden", isHidden);
+    };
+
+    updateToggleLabel();
+
+    toggleButton.addEventListener("click", () => {
+      docsbotFrame.classList.toggle("is-hidden");
+      updateToggleLabel();
+    });
+
+    document.body.appendChild(toggleButton);
+  }
 });
