@@ -9,6 +9,11 @@ body {
   font-size: 1.12rem;
 }
 
+html {
+  scrollbar-gutter: stable;
+  scroll-padding-top: 86px;
+}
+
 body.menu-open {
   overflow: hidden;
 }
@@ -34,13 +39,52 @@ body.menu-open {
 
 /* ===== ハンバーガーボタン ===== */
 .menu-btn {
-  font-size: 1.6rem;
+  position: relative;
+  width: 30px;
+  height: 30px;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 0;
   margin-left: auto;
   margin-right: 0;
+  transition: all 0.5s;
+  z-index: 3;
+}
+
+.menu-btn span {
+  display: block;
+  position: absolute;
+  left: 0;
+  width: 30px;
+  height: 2px;
+  background-color: #333;
+  border-radius: 4px;
+  transition: all 0.5s;
+}
+
+.menu-btn span:nth-child(1) {
+  top: 4px;
+}
+
+.menu-btn span:nth-child(2) {
+  top: 14px;
+}
+
+.menu-btn span:nth-child(3) {
+  bottom: 4px;
+}
+
+body.menu-open .menu-btn span:nth-child(1) {
+  transform: translateY(10px) rotate(-315deg);
+}
+
+body.menu-open .menu-btn span:nth-child(2) {
+  opacity: 0;
+}
+
+body.menu-open .menu-btn span:nth-child(3) {
+  transform: translateY(-10px) rotate(315deg);
 }
 
 /* ===== サイドメニュー ===== */
@@ -71,6 +115,21 @@ body.menu-open {
 
 #sideMenu li {
   margin-bottom: 14px;
+}
+
+#sideMenu li.menu-level-h2 a {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+#sideMenu li.menu-level-h3 {
+  margin-left: 12px;
+}
+
+#sideMenu li.menu-level-h3 a {
+  font-size: 0.88rem;
+  color: #64748b;
+  font-weight: 500;
 }
 
 #sideMenu a {
@@ -128,6 +187,18 @@ h3 {
   padding: 0.25em 0.7em 0.25em 12px;
   border-left: 4px solid #0ea5e9;
   border-radius: 8px;
+  scroll-margin-top: 86px;
+}
+
+h4 {
+  margin-top: 1.8em;
+  margin-bottom: 0.6em;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  border-bottom: 2px solid #93c5fd;
+  padding-bottom: 0.2em;
+  scroll-margin-top: 86px;
 }
 
 /* ===== 段落 ===== */
@@ -213,6 +284,16 @@ pre {
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color: #111827;
+}
+
+.markdown-body p code,
+.markdown-body li code {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  padding: 0.08em 0.35em;
+  font-weight: 600;
 }
 
 pre code {
@@ -322,19 +403,37 @@ summary {
 }
 
 .highlight {
+  color: #1d4ed8;
+  font-weight: 700;
+  background: transparent;
+  padding: 0;
+}
+
+.highlight-strong {
   background: #ffe082;
+  color: #111827;
+  font-weight: 800;
   padding: 0.05em 0.2em;
   border-radius: 4px;
 }
 
-.highlight-strong {
-  background: linear-gradient(180deg, #ffcc33 0%, #ffb300 100%);
-  color: #0b1020;
+.time-a {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.time-b {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.critical-text {
+  color: #b91c1c;
   font-weight: 800;
-  padding: 0.08em 0.35em;
-  border-radius: 6px;
-  border: 1px solid #d97706;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08), 0 3px 10px rgba(217, 119, 6, 0.28);
+  text-decoration-line: underline;
+  text-decoration-style: double;
+  text-decoration-color: #b91c1c;
+  text-underline-offset: 2px;
 }
 
 /* ===== DocsBot ===== */

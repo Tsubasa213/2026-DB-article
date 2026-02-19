@@ -24,29 +24,18 @@
 本資料では<span class="highlight-strong">PITRの構成要素</span>、演習環境での<span class="highlight-strong">PITR再現手順</span>、失敗時の切り分けに焦点を置きます。
 </p>
 
-<h2>2. 演習環境の前提</h2>
+<h2>2. 実験環境</h2>
 <ul>
   <li>PostgreSQL 17 / Docker</li>
   <li>授業提供の演習用コンテナ環境</li>
   <li>PowerShell / bash どちらでも可</li>
 </ul>
 <p>
-本講義資料のリンク：<a href="https://takeshiwada1980.github.io/DB-2025/">DB-2025 講義資料 Index</a>
+参考リンク：<a href="https://takeshiwada1980.github.io/DB-2025/">DB-2025 講義資料 Index</a>
 </p>
 <p>
 第12回講義のバックアップ/リストアの内容を復習してから進むとスムーズ：
 <a href="https://takeshiwada1980.github.io/DB-2025/lecture12.html#%E3%83%90%E3%83%83%E3%82%A2%E3%83%83%E3%83%97%E3%81%A8%E3%83%AA%E3%82%B9%E3%83%88%E3%82%A2">第12回講義: バックアップとリストア</a>
-</p>
-
-<h3>2.2 学習タイムライン</h3>
-<ul>
-  <li>2. バックアップ復習：論理バックアップの限界を確認</li>
-  <li>3. PITRの仕組み：タイムライン分岐の理解を追加</li>
-  <li>4. ハンズオン準備：アーカイブ設定と再起動確認</li>
-  <li>4.5〜4.6 リカバリ演習：ログの読み方を含む</li>
-  <li>5. トラブルシューティング：失敗体験を組み込む</li>
-  <li>6-7. 定着確認・ドリル</li>
-</ul>
 </p>
 
 <h3>2.1 バックアップ/リストアの復習</h3>
@@ -72,13 +61,13 @@ PITRはベースバックアップとWALの組み合わせが前提です。
 そのため、論理だけでなく物理バックアップの特徴も把握しておく必要があります。
 </p>
 <ul>
-  <li><span class="highlight">論理バックアップ</span>：SQLとして取り出す。pg_dump を使う。<strong>可搬性が高い</strong>が、復元に時間がかかる。</li>
-  <li><span class="highlight">物理バックアップ</span>：DBファイルを丸ごと複製します。pg_basebackup を使います。<strong>復旧が速い</strong>ですが、同一バージョン前提です。</li>
+  <li><span class="highlight">論理バックアップ</span>：SQLとして取り出す。<code>pg_dump</code> を使う。<strong>可搬性が高い</strong>が、復元に時間がかかる。</li>
+  <li><span class="highlight">物理バックアップ</span>：DBファイルを丸ごと複製します。<code>pg_basebackup</code> を使います。<strong>復旧が速い</strong>ですが、同一バージョン前提です。</li>
 </ul>
 
 <h4>論理バックアップの形式と使い分け</h4>
 <p>
-pg_dump の出力形式は用途で選びます。SQL形式は人が読めますが、サイズが大きくなりやすいです。
+<code>pg_dump</code> の出力形式は用途で選びます。SQL形式は人が読めますが、サイズが大きくなりやすいです。
 カスタム形式は圧縮・並列復元に向いています。
 </p>
 <pre><code class="language-bash">
@@ -103,7 +92,7 @@ pg_dump -d mydb -F c -f backup.dump
 
 <h4>論理バックアップの細かい粒度</h4>
 <p>
-pg_dump はDB全体だけでなく、スキーマやテーブル単位で切り出せます。
+<code>pg_dump</code> はDB全体だけでなく、スキーマやテーブル単位で切り出せます。
 障害対応で「一部だけ戻したい」状況に強みがあります。
 </p>
 <pre><code class="language-bash">
@@ -116,7 +105,7 @@ pg_dump -d mydb -t orders -f orders.sql
 
 <h4>リストアの基本パターン</h4>
 <p>
-復元では接続先と形式の指定が重要です。SQLは psql で流し込み、カスタム形式は pg_restore を使います。
+復元では接続先と形式の指定が重要です。SQLは <code>psql</code> で流し込み、カスタム形式は <code>pg_restore</code> を使います。
 </p>
 <pre><code class="language-bash">
 # SQL形式の復元
@@ -166,14 +155,16 @@ pg_dump -d mydb -F c -f /backup/dumps/mydb_20260129.dump \
   &gt; /backup/logs/backup_20260129.log 2&gt;&amp;1
 </code></pre>
 
-<h4>よくある疑問：論理バックアップだけで十分？</h4>
-<p>
-論理バックアップだけでは時点指定の復旧に対応できません。PITRには<strong>物理バックアップ + WAL</strong>が必須です。
-</p>
+<div class="column">
+  <div class="column-title">よくある疑問：論理バックアップだけで十分か</div>
+  <p class="column-note">
+    論理バックアップだけでは時点指定の復旧に対応できません。PITRには<strong>物理バックアップ + WAL</strong>が<span class="critical-text">必須</span>です。
+  </p>
+</div>
 
 <h4>論理バックアップの代表例</h4>
 <p>
-よく使うのは <span class="highlight">pg_dump</span> と <span class="highlight">pg_restore</span> です。SQLまたはカスタム形式で保存し、必要に応じて復元します。
+よく使うのは <code>pg_dump</code> と <code>pg_restore</code> です。SQLまたはカスタム形式で保存し、必要に応じて復元します。
 </p>
 <pre><code class="language-bash">
 # 例: 単一DBをダンプ
@@ -187,8 +178,12 @@ psql -d mydb -f backup.sql
 <ul>
   <li>接続先が間違っていないか。誤って本番へ流さない</li>
   <li>権限やオーナーの違いで失敗することがある</li>
-  <li>復元後の整合性チェックは必須。件数、主要テーブルの確認</li>
+  <li>復元後の整合性チェックは<span class="critical-text">必須</span>。件数、主要テーブルの確認</li>
 </ul>
+
+<p>
+ここまででバックアップ/リストアの基礎が揃いました。次の「復習の要点」で、PITR理解に必要な観点を短く確認します。
+</p>
 
 <div class="column">
   <div class="column-title">復習の要点</div>
@@ -219,6 +214,13 @@ psql -d mydb -f backup.sql
   <li>復元時間が長いなら、<span class="highlight">バックアップ世代の間隔</span>を見直す</li>
   <li>失敗原因は大抵「<span class="highlight">権限・接続先・ファイルパス</span>」のどれか</li>
   <li>手順は短く書くより、<span class="highlight">やること・やらないこと</span>を明示する</li>
+</ul>
+
+<h3>定着確認（第2章）</h3>
+<ul>
+  <li>論理バックアップだけで時点指定復旧は<span class="masked">できない</span>。</li>
+  <li>PITRには<span class="masked">物理バックアップ + WAL</span>の組み合わせが必要である。</li>
+  <li>復元後は件数確認などの<span class="masked">整合性チェック</span>を必ず行う。</li>
 </ul>
 
 <h2>3. PITRの全体像</h2>
@@ -274,7 +276,7 @@ WALが残っていても<span class="highlight">WALだけでは復旧できな�
 <div class="column">
   <div class="column-title">参考質問例</div>
   <p class="column-note">
-  「WAL が REDO ログである理由を、障害復旧の観点で具体例つきで説明してください。」
+  「WALがREDOログとして機能する理由を、障害発生時の復旧手順（ログ再生の流れ）に沿って説明してください。あわせて、UNDOと誤解されやすい点も補足してください。」
   </p>
 </div>
 
@@ -337,15 +339,28 @@ Timeline 2:               ----D----E----(復旧後の新しい履歴)
 <div class="column">
   <div class="column-title">参考質問例</div>
   <p class="column-note">
-  「PostgreSQL の LSN とは何か。PITR で使う理由を短く説明してください。」
+  「PostgreSQLのLSNとは何を表す値かを説明し、`recovery_target_time` と比べたときにLSN指定が有利になる場面を1つ挙げてください。」
   </p>
 </div>
 
 <h3>3.5 「ダンプ復元」との違い</h3>
 <p>
-pg_dump + psql の復元は「その時点の状態に戻す」方式で、時点指定はできません。
-PITRは「誤操作直前」など細かい時点に戻せる点が大きな違いです。
+<code>pg_dump</code> + <code>psql</code> の復元は「ダンプ取得時点へ戻す」方式であり、時点指定には対応できません。
+一方、PITRはベースバックアップとWALを組み合わせることで、「誤操作直前」など細かい時点へ戻せます。
 </p>
+<ul>
+  <li><span class="highlight">復旧粒度</span>：<code>pg_dump</code> + <code>psql</code> は取得時点単位、PITRは秒単位の時点指定に対応します。</li>
+  <li><span class="highlight">主な用途</span>：論理バックアップは移行・部分復元、PITRは障害直前への巻き戻しに向きます。</li>
+  <li><span class="highlight">前提条件</span>：PITRにはベースバックアップ運用とWALアーカイブ運用の両方が必要です。</li>
+</ul>
+
+<div class="column">
+  <div class="column-title">実務での使い分け</div>
+  <p class="column-note">
+    「誤操作の数分前に戻したい」ならPITRを選択します。
+    「環境移行や一部データの取り出し」が目的なら、<code>pg_dump</code>/<code>pg_restore</code> を優先します。
+  </p>
+</div>
 
 <h3>3.6 運用での考え方</h3>
 <p>
@@ -386,20 +401,45 @@ PITRはこの状況で最短復旧を実現するための選択肢になる。
 
 <h3>3.9 時系列で見るPITR</h3>
 <p>
-「ベース → WAL適用 → ターゲット停止」という流れを時系列で整理します。
+PITRは「まず起点を用意し、次に更新履歴を順に再生し、最後に指定時点で止める」流れです。
 </p>
+
+<div class="column">
+  <div class="column-title">図解：PITRの時系列フロー</div>
+  <pre><code class="language-text">
+<span class="time-a">時刻A</span>                    <span class="time-b">時刻B</span>(障害)
+ |--------------------------|
+ [ベースバックアップ]   [誤操作発生]
+         \n+      WALアーカイブ（A→B）を順に再生
+                          ^
+                          |
+                復旧ターゲット（B直前）で停止
+  </code></pre>
+  <p class="column-note">
+    ポイントは「ベースバックアップを起点に、WALを前から適用し、目標時点で止める」ことです。
+  </p>
+</div>
+
 <ol>
-  <li>ベースバックアップ取得。時刻A</li>
-  <li>WALアーカイブが蓄積。A〜B</li>
-  <li>障害発生。時刻B</li>
-  <li>復旧ターゲットは時刻B直前で停止</li>
+  <li><span class="time-a">時刻A</span>でベースバックアップを取得し、復旧の起点を作ります。</li>
+  <li><span class="time-a">時刻A</span>から<span class="time-b">時刻B</span>までの更新は、WALアーカイブとして蓄積されます。</li>
+  <li><span class="time-b">時刻B</span>で障害または誤操作が発生します。</li>
+  <li>復旧時はWALをAから順に適用し、<span class="time-b">時刻B</span>の直前で再生を停止します。</li>
 </ol>
 <div class="column">
   <div class="column-title">参考質問例</div>
   <p class="column-note">
-  「PITRの流れを『時系列の出来事』として説明してください。1分で読める長さで。」
+  「PITRの処理を『ベースバックアップ取得 → WAL蓄積 → 目標時点で停止』の順で説明し、各段階で確認すべきログ/設定を1つずつ挙げてください。」
   </p>
 </div>
+
+<h3>定着確認（第3章）</h3>
+<ul>
+  <li>WALは基本的に<span class="masked">REDOログ</span>として機能する。</li>
+  <li>WALだけでは復旧できず、<span class="masked">ベースバックアップ</span>が起点として必要である。</li>
+  <li>時点指定復旧で厳密な位置を指定する場合は<span class="masked">LSN</span>が有効である。</li>
+</ul>
+
 <h3>3.10 時刻特定の手法・自動ログと手動記録</h3>
 <p>
 PITRで最も難しいのは「何時何分何秒に戻すべきか」を特定することです。これには主に2つの自動ログが活用されます。
@@ -474,7 +514,7 @@ docker exec -it db-postgres bash -c "echo \"restore_command = 'cp /backup/wal_ar
 docker restart db-postgres
 </code></pre>
 <p>
-設定を変える前に、<span class="highlight">今の値を控える</span>ことは必須です。戻せなくなると原因調査が難しくなります。
+設定を変える前に、<span class="highlight">今の値を控える</span>ことは<span class="critical-text">必須</span>です。戻せなくなると原因調査が難しくなります。
 </p>
 <p>
 SQLの実行は、講義資料どおりに <span class="highlight">VSCodeのタスク実行</span> または
@@ -515,7 +555,7 @@ wal_level = replica
 <div class="column">
   <div class="column-title">参考質問例</div>
   <p class="column-note">
-  「archive_command が失敗する典型例と、確認すべきログの場所を教えてください。」
+  「`archive_command` が失敗したときの切り分け手順を、①パス ②権限 ③既存ファイル衝突 ④ログ確認 の順で具体的に示してください。」
   </p>
 </div>
 
@@ -608,7 +648,7 @@ Docker環境では <span class="highlight">/var/lib/postgresql/data</span> に�
   1) <span class="highlight">設定ファイルを反映</span>。postgresql.auto.conf へ追記 →
   2) <span class="highlight">recovery.signal を作成</span> →
   3) <span class="highlight">サーバー起動</span>。コンテナ start
-  この順序が崩れると、設定が反映されないまま起動して復旧が進まないことがある。
+  この順序が崩れると、<span class="critical-text">設定が反映されないまま起動して復旧が進まない</span>ことがある。
   </p>
 </div>
 
@@ -629,6 +669,13 @@ SELECT pg_last_wal_replay_lsn();
 -- 最後に再生したトランザクション時刻
 SELECT pg_last_xact_replay_timestamp();
 </code></pre>
+
+<h3>定着確認（第4章）</h3>
+<ul>
+  <li><code>restore_command</code> の設定ミスは<span class="masked">復旧停止</span>の原因になりやすい。</li>
+  <li>復旧手順では <span class="masked">設定反映 → recovery.signal作成 → 起動</span> の順序を守る。</li>
+  <li>復旧状態の確認には <span class="masked">pg_is_in_recovery()</span> を使う。</li>
+</ul>
 
 <h2>5. 注意点</h2>
 <ul>
@@ -654,7 +701,7 @@ SELECT pg_last_xact_replay_timestamp();
 <h3>5.2 WALの掃除</h3>
 <p>
 WALアーカイブを溜め続けるとディスクが溢れます。古いWALを削除する場合は
-<span class="highlight">pg_archivecleanup</span> の利用を検討してください。
+<code>pg_archivecleanup</code> の利用を検討してください。
 </p>
 <pre><code class="language-bash">
 # 例: 古いWALを削除。最新のWALファイルを基準に
@@ -669,40 +716,25 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
   </p>
 </details>
 
-<h2>6. 定着確認</h2>
-<p>
-以下の空欄補充で、PITRの要点を確認する。
-</p>
-<ol>
-  <li>ベースバックアップは<span class="masked">起点となる完全コピー</span>、WALアーカイブは<span class="masked">更新履歴の保管</span>を表す。</li>
-  <li><span class="masked">pg_basebackup</span>はDB全体のスナップショットを取得する。</li>
-  <li>archive_command が失敗した場合は<span class="masked">PostgreSQLログ</span>と<span class="masked">アーカイブ先の権限/パス</span>を確認する。</li>
-  <li>recovery_target_time は<span class="masked">復旧を止める時点</span>を指定するために使う。</li>
-  <li>復旧後に動作不良があれば、まず<span class="masked">WAL欠落の有無</span>を確認する。</li>
-  <li>WALは基本的に<span class="masked">REDOログ</span>として機能する。</li>
-  <li>PITRはWALを<span class="masked">時系列に適用</span>し、指定時刻で停止する。</li>
-  <li>RPOは<span class="masked">失ってよい最大時間</span>、RTOは<span class="masked">復旧に許される時間</span>を指す。</li>
-  <li>LSNは<span class="masked">WALの位置</span>を表す番号である。</li>
-  <li>ベースバックアップが古すぎると<span class="masked">復旧時間が長くなる</span>。</li>
-  <li>WAL保存先が満杯だと<span class="masked">アーカイブが停止</span>する。</li>
-  <li>復旧ターゲット時刻は<span class="masked">ログ時刻と整合</span>を取る必要がある。</li>
-  <li>復旧後に書き込みできない場合は<span class="masked">recovery.signal</span>を確認する。</li>
-  <li>PITRは<span class="masked">時点指定の復旧</span>が最大の強みである。</li>
-  <li>監査対応では<span class="masked">LSN指定</span>が有効な場合がある。</li>
-</ol>
+<h3>定着確認（第5章）</h3>
+<ul>
+  <li><code>archive_command</code> の異常時は <span class="masked">パス・権限・既存ファイル衝突・ログ</span> の順で確認する。</li>
+  <li>WAL削除前には <span class="masked">復旧可能範囲</span> を先に定義する。</li>
+  <li>復旧後に不整合がある場合は <span class="masked">接続先誤りやWAL欠落</span> を疑う。</li>
+</ul>
 
-<details>
-  <summary>演習：RPOとRTOを自分の運用に当てはめてください</summary>
-  <p>
-    1時間以内に復旧したい場合、ベースバックアップ頻度・WAL保持期間・手順自動化をどう設計するか整理してみてください。
-  </p>
-</details>
-
-<h2>7. SQLドリル / 演習</h2>
+<h2>6. SQLドリル / 演習</h2>
 <p>
 本演習では、第10回講義などで構築した <code>x_characters</code> や <code>x_gold_transfers</code> テーブルを使用します。
 単にクエリを書くだけでなく、あえて誤ったコードを確定（COMMIT）させ、その後にPITRを用いて正常な状態へ戻すプロセスを体験します。
 </p>
+
+<div class="column">
+  <div class="column-title">解答例の場所</div>
+  <p class="column-note">
+    各演習の解答は <a href="#answers">第7章「演習の解答例」</a> にまとめています。演習を実施した後に第7章へ移動して確認してください。
+  </p>
+</div>
 
 <div class="column">
   <div class="column-title">演習環境の再構築</div>
@@ -840,7 +872,7 @@ COMMIT;
   </p>
 </div>
 
-<h2>8. 演習の解答例</h2>
+<h2 id="answers">7. 演習の解答例</h2>
 <p>各演習に共通する標準的なリカバリ手順の考え方です。時刻やパスは各自の環境に合わせて調整してください。</p>
 
 <details>

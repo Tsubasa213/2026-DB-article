@@ -3,8 +3,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const menuBtn = document.getElementById("menuBtn");
   if (!menuBtn) return;
 
-  // 記事内のh2を取得してIDを付与
-  const headings = Array.from(document.querySelectorAll("h2"));
+  // ボタンを3本線に初期化（既存レイアウトは維持）
+  if (!menuBtn.querySelector("span")) {
+    menuBtn.textContent = "";
+    for (let index = 0; index < 3; index += 1) {
+      const line = document.createElement("span");
+      menuBtn.appendChild(line);
+    }
+  }
+
+  // 記事内のh2/h3を取得してIDを付与
+  const headings = Array.from(document.querySelectorAll("h2, h3"));
   const idCount = new Map();
   headings.forEach((heading) => {
     if (!heading.id) {
@@ -29,7 +38,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const listItems = headings
       .map((heading) => {
         const text = heading.textContent.trim();
-        return `<li><a href="#${heading.id}">${text}</a></li>`;
+        const levelClass = heading.tagName.toLowerCase() === "h3" ? "menu-level-h3" : "menu-level-h2";
+        return `<li class="${levelClass}"><a href="#${heading.id}">${text}</a></li>`;
       })
       .join("");
     menu.innerHTML = `<ul>${listItems}</ul>`;
@@ -40,11 +50,20 @@ document.addEventListener("DOMContentLoaded", () => {
   // 表示状態
   let isOpen = false;
 
+  const updateMenuButton = () => {
+    menuBtn.classList.toggle("is-open", isOpen);
+    menuBtn.setAttribute("aria-label", isOpen ? "メニューを閉じる" : "メニューを開く");
+    menuBtn.title = isOpen ? "メニューを閉じる" : "メニューを開く";
+  };
+
+  updateMenuButton();
+
   // クリックで開閉
   menuBtn.addEventListener("click", () => {
     isOpen = !isOpen;
     menu.classList.toggle("open", isOpen);
     document.body.classList.toggle("menu-open", isOpen);
+    updateMenuButton();
   });
 
   // メニュー内リンククリック時に閉じる
@@ -53,6 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
       isOpen = false;
       menu.classList.remove("open");
       document.body.classList.remove("menu-open");
+      updateMenuButton();
     }
   });
 

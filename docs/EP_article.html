@@ -52,7 +52,7 @@
   <li>PostgreSQL 17</li>
   <li>Docker（演習コンテナ）</li>
   <li>OS: Windows / macOS / Linux いずれでも可</li>
-  <li>クライアント: psql</li>
+  <li>クライアント: <code>psql</code></li>
 </ul>
 
 <h3>2.1 検証用スキーマの作成</h3>
@@ -125,9 +125,24 @@ ANALYZE orders;
 <div class="column">
   <div class="column-title">補足：本番でEXPLAIN ANALYZEを使うとき</div>
   <p class="column-note">
-    EXPLAIN ANALYZE は実際にクエリを実行します。更新系SQLでは影響が出るため、検証環境で再現して確認するのが安全です。
+    EXPLAIN ANALYZE は実際にクエリを実行します。更新系SQLでは影響が出るため、<span class="critical-text">検証環境で再現して確認することは必須</span>です。
   </p>
 </div>
+
+<div class="column">
+  <div class="column-title">よくある疑問：インデックスを作れば必ず速くなるか</div>
+  <p class="column-note">
+    必ずしも速くなりません。条件の選択性が低い場合や、取得列が多い場合は <code>Seq Scan</code> が有利なことがあります。
+    追加前後で <code>EXPLAIN (ANALYZE, BUFFERS)</code> を比較して判断することが<span class="critical-text">必須</span>です。
+  </p>
+</div>
+
+<h3>定着確認（第2章）</h3>
+<ul>
+  <li>性能確認では <span class="masked">EXPLAIN ANALYZE</span> で実測を取る。</li>
+  <li>更新系SQLの検証は <span class="masked">本番ではなく検証環境</span> で行う。</li>
+  <li>比較時は <span class="masked">同一SQLを複数回実行</span> して中央値を見る。</li>
+</ul>
 
 <h2>3. EXPLAIN / ANALYZE の基本</h2>
 <p>
@@ -233,6 +248,13 @@ WHERE relname IN ('orders', 'customers');
   </p>
 </details>
 
+<h3>定着確認（第3章）</h3>
+<ul>
+  <li>実行計画の初見では <span class="masked">Node Type / rows / actual rows / loops</span> を優先確認する。</li>
+  <li><code>cost</code> は <span class="masked">相対評価値</span> であり実時間と一致しない。</li>
+  <li>原因切り分けでは <span class="masked">buffers read/hit</span> を実行時間と併せて確認する。</li>
+</ul>
+
 <h2>4. データ量と実行計画の変化</h2>
 <p>
 同一SQLでも、データ量が増えるとプランナが採用する計画は変化します。ここでは件数を増やしながら比較します。
@@ -288,6 +310,13 @@ GroupAggregate と HashAggregate のどちらが出るかは、並び順やメ�
     「なぜその計画が選ばれたか」を説明しやすくなります。
   </p>
 </details>
+
+<h3>定着確認（第4章）</h3>
+<ul>
+  <li>同一SQLでもデータ量で <span class="masked">Node Type が変わる</span> 可能性がある。</li>
+  <li>計画比較は <span class="masked">実行時間だけで判断しない</span>。</li>
+  <li>比較時は <span class="masked">rows誤差とBUFFERS(read/hit)</span> を同時に見る。</li>
+</ul>
 
 <h2>5. インデックスの影響</h2>
 <p>
@@ -371,6 +400,13 @@ WHERE status = 'canceled';
   </p>
 </details>
 
+<h3>定着確認（第5章）</h3>
+<ul>
+  <li>インデックス設計では <span class="masked">選択性と列順</span> を先に確認する。</li>
+  <li>複合インデックスは <span class="masked">先頭列条件</span> がないと効きにくい。</li>
+  <li>索引追加は検索性能だけでなく <span class="masked">更新コスト</span> も評価する。</li>
+</ul>
+
 <h2>6. 統計情報と推定誤差</h2>
 <p>
 プランナは統計情報を使って rows を推定します。推定が外れると、計画選択も外れます。
@@ -379,7 +415,7 @@ WHERE status = 'canceled';
 <h3>6.1 どこを見るか</h3>
 <ul>
   <li>EXPLAIN の rows と actual rows の比率</li>
-  <li>pg_stats の n_distinct / most_common_vals</li>
+  <li><code>pg_stats</code> の n_distinct / most_common_vals</li>
   <li>ANALYZE 実行タイミング</li>
 </ul>
 
@@ -430,7 +466,7 @@ ANALYZE orders;
 <details>
   <summary>演習：ANALYZE前後でどの列の統計を確認しますか？</summary>
   <p>
-    WHERE句やJOIN条件で使う列を優先して確認します。pg_stats の most_common_vals や n_distinct が参考になります。
+    WHERE句やJOIN条件で使う列を優先して確認します。<code>pg_stats</code> の most_common_vals や n_distinct が参考になります。
   </p>
 </details>
 
@@ -440,6 +476,13 @@ ANALYZE orders;
     status と shipping_pref のように、列同士の依存関係が強いケースで効果を発揮しやすいです。
   </p>
 </details>
+
+<h3>定着確認（第6章）</h3>
+<ul>
+  <li>rows と actual rows の乖離が大きい場合は <span class="masked">統計情報の古さ</span> を疑う。</li>
+  <li>偏った更新後は <code>ANALYZE</code> の実施が<span class="critical-text">必須</span>である。</li>
+  <li>列相関が強い場合は <span class="masked">extended statistics</span> を検討する。</li>
+</ul>
 
 <h2>7. 実行計画と実行時間の乖離</h2>
 <p>
@@ -534,9 +577,17 @@ LIMIT 200;
 <details>
   <summary>補足：pg_stat_statementsとの併用</summary>
   <p>
-  単発のEXPLAINだけでは偏るため、継続的な遅いSQLの傾向は pg_stat_statements で観測すると改善優先度を決めやすくなります。
+  単発のEXPLAINだけでは偏るため、継続的な遅いSQLの傾向は <code>pg_stat_statements</code> で観測すると改善優先度を決めやすくなります。
   </p>
 </details>
+
+<div class="column">
+  <div class="column-title">参考質問例</div>
+  <p class="column-note">
+    「このSQLの実行計画で最初に確認すべき3項目（Node Type / rows / actual rows）を挙げ、
+    それぞれから何を判断するかを1文ずつ説明してください。」
+  </p>
+</div>
 
 <details>
   <summary>演習：同じ計画なのに遅いとき、最初に何を確認しますか？</summary>
@@ -545,53 +596,36 @@ LIMIT 200;
   </p>
 </details>
 
-<h2>8. 定着確認</h2>
 <p>
-以下の穴埋めで、実行計画読解の要点を確認する。
+ここまでで「計画の読み方」と「乖離の原因切り分け」を確認できました。
+次はSQLドリルで、観測→仮説→再測定を通して説明力を仕上げます。
 </p>
+
+<h3>定着確認（第7章）</h3>
 <ul>
-  <li>EXPLAIN の rows は<span class="masked">推定行数</span>であり、EXPLAIN ANALYZE の actual rows は実測行数である。</li>
-  <li>条件選択性が低い場合、インデックスがあっても<span class="masked">Seq Scan</span>が選ばれることがある。</li>
-  <li>大量更新後に計画が不安定なら、最初に<span class="masked">ANALYZE</span>を疑うべきである。</li>
-  <li>同一計画なのに遅い場合、<span class="masked">キャッシュ状態やI/O待ち</span>を確認する。</li>
-  <li>複合インデックスは列順が重要で、先頭列条件がないと<span class="masked">効きにくい</span>。</li>
+  <li>同一計画でも実行時間差の主因は <span class="masked">キャッシュ/I/O/同時実行</span> である。</li>
+  <li>再現実験では <span class="masked">基準計測→要因変更→再計測</span> の順序を守る。</li>
+  <li>継続監視には <code>pg_stat_statements</code> の併用が有効である。</li>
 </ul>
 
-<h3>8.1 ○×チェック</h3>
-<ul>
-  <li>cost は実行時間(ms)と完全一致する。→ <span class="masked">×</span></li>
-  <li>Index Scan は常に Seq Scan より速い。→ <span class="masked">×</span></li>
-  <li>rows 推定誤差は JOIN 方式選択に影響する。→ <span class="masked">○</span></li>
-  <li>BUFFERS で read/hit を確認できる。→ <span class="masked">○</span></li>
-</ul>
-
-<h3>8.2 口頭説明トレーニング</h3>
-<p>
-以下を1分で説明できるか確認してください。
-</p>
-<ol>
-  <li>なぜこのSQLで Seq Scan が選ばれたか</li>
-  <li>rows と actual rows の差から何を疑うか</li>
-  <li>インデックス追加と統計更新、どちらを先に行うか</li>
-</ol>
-
-<details>
-  <summary>演習：レビューコメントを書く想定で説明してみましょう</summary>
-  <p>
-    「現状」「課題」「改善案」「再検証方法」の4点で短く書く。レビュー品質の標準化につながる。
-  </p>
-</details>
-
-<h2>9. SQLドリルと解答例</h2>
+<h2>8. SQLドリルと解答例</h2>
 <p>
 実行計画を読む練習として、各課題をステップ形式で実施します。
 </p>
 
 <div class="column">
+  <div class="column-title">解答例の場所</div>
+  <p class="column-note">
+    各ドリルの解答は、それぞれの問題ブロック直下にある「<strong>解答例を見る</strong>」内にあります。
+    手順を実行してから、同じドリル内の解答を開いて差分を確認してください。
+  </p>
+</div>
+
+<div class="column">
   <div class="column-title">環境再構築の案内</div>
   <p class="column-note">
-    演習でテーブル状態が崩れた場合は、<span class="highlight">from-teacher/10/create-x_db.sql</span> を実行して初期状態へ戻してください。
-    例：<span class="highlight">npm run sql from-teacher/10/create-x_db.sql</span>
+    演習でテーブル状態が崩れた場合は、<code>from-teacher/10/create-x_db.sql</code> を実行して初期状態へ戻してください。
+    例：<code>npm run sql from-teacher/10/create-x_db.sql</code>
   </p>
 </div>
 
@@ -882,7 +916,14 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
   </p>
 </details>
 
-<h2>10. まとめ</h2>
+<h3>定着確認（第8章）</h3>
+<ul>
+  <li>ドリルは <span class="masked">現状確認→対策→事後検証</span> の3段階で進める。</li>
+  <li>比較結果は <span class="masked">計画・実行時間・BUFFERS</span> をセットで記録する。</li>
+  <li>改善判断は <span class="masked">再現可能な比較結果</span> を根拠に行う。</li>
+</ul>
+
+<h2>9. まとめ</h2>
 <ul>
   <li>Node・rows誤差・buffers をセットで確認する。</li>
   <li>選択性と列順を基準にインデックスを比較する。</li>
@@ -894,7 +935,7 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
 <div class="column">
   <div class="column-title">次のステップ</div>
   <p class="column-note">
-    次回は pg_stat_statements と auto_explain を併用し、
+    次回は <code>pg_stat_statements</code> と <code>auto_explain</code> を併用し、
     「本番に近い継続観測」と「再現性あるチューニング手順」を設計します。
   </p>
 </div>
