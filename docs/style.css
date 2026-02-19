@@ -274,12 +274,25 @@ summary {
   border-radius: 8px;
   border: solid 2px #fff57c;
   cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.markdown-body span.masked:not(.revealed)::selection {
+  background: transparent;
+  color: transparent;
 }
 
 .markdown-body span.masked.revealed {
   color: #111827;
   background-color: #e0f2fe;
   border-color: #93c5fd;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
 
 .markdown-body ul {

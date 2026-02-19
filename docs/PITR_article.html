@@ -36,6 +36,7 @@
 <p>
 第12回講義のバックアップ/リストアの内容を復習してから進むとスムーズ：
 <a href="https://takeshiwada1980.github.io/DB-2025/lecture12.html#%E3%83%90%E3%83%83%E3%82%A2%E3%83%83%E3%83%97%E3%81%A8%E3%83%AA%E3%82%B9%E3%83%88%E3%82%A2">第12回講義: バックアップとリストア</a>
+</p>
 
 <h3>2.2 学習タイムライン</h3>
 <ul>
@@ -53,9 +54,9 @@
 PITRの前に、基本のバックアップ/リストアを整理します。ここでは<strong>論理バックアップ</strong>を中心に扱い、SQLとして取り出す方式を確認します。
 </p>
 <ul>
-  <li><span class="highlight">目的</span>：壊したときに「安全に戻せる」状態を作る</li>
-  <li><span class="highlight">粒度</span>：DB全体 / スキーマ / テーブル単位で取得できる</li>
-  <li><span class="highlight">基本思想</span>：バックアップは「取りっぱなし」ではなく、リストアできることが重要</li>
+  <li><span class="highlight">目的</span>：障害時に安全に戻せる状態を確保します。</li>
+  <li><span class="highlight">粒度</span>：DB全体 / スキーマ / テーブル単位で取得可能です。</li>
+  <li><span class="highlight">基本思想</span>：取得だけで終えず、リストア成功まで確認します。</li>
 </ul>
 
 <h4>用語の意味</h4>
@@ -66,9 +67,9 @@ PITRの前に、基本のバックアップ/リストアを整理します。こ
 
 <h4>バックアップの種類</h4>
 <p>
-バックアップには大きく<strong>論理バックアップ</strong>と<strong>物理バックアップ</strong>がある。
-PITRは物理バックアップであるベースバックアップとWALの組み合わせが前提になるため、
-論理だけでなく物理の特徴も把握しておく必要がある。
+バックアップには大きく<strong>論理バックアップ</strong>と<strong>物理バックアップ</strong>があります。
+PITRはベースバックアップとWALの組み合わせが前提です。
+そのため、論理だけでなく物理バックアップの特徴も把握しておく必要があります。
 </p>
 <ul>
   <li><span class="highlight">論理バックアップ</span>：SQLとして取り出す。pg_dump を使う。<strong>可搬性が高い</strong>が、復元に時間がかかる。</li>
@@ -77,8 +78,8 @@ PITRは物理バックアップであるベースバックアップとWALの組�
 
 <h4>論理バックアップの形式と使い分け</h4>
 <p>
-pg_dump の出力形式は用途で選ぶ。SQL形式は人が読めるがサイズが大きくなりやすい。
-カスタム形式は圧縮・並列復元に向いている。
+pg_dump の出力形式は用途で選びます。SQL形式は人が読めますが、サイズが大きくなりやすいです。
+カスタム形式は圧縮・並列復元に向いています。
 </p>
 <pre><code class="language-bash">
 # 例: SQL形式
@@ -102,8 +103,8 @@ pg_dump -d mydb -F c -f backup.dump
 
 <h4>論理バックアップの細かい粒度</h4>
 <p>
-pg_dumpはDB全体だけでなく、スキーマやテーブル単位で切り出せる。
-障害対応で「一部だけ戻したい」状況に強い。
+pg_dump はDB全体だけでなく、スキーマやテーブル単位で切り出せます。
+障害対応で「一部だけ戻したい」状況に強みがあります。
 </p>
 <pre><code class="language-bash">
 # スキーマ単位
@@ -115,12 +116,13 @@ pg_dump -d mydb -t orders -f orders.sql
 
 <h4>リストアの基本パターン</h4>
 <p>
-復元では接続先と形式の指定が重要。SQLはpsqlで流し込み、カスタム形式はpg_restoreを使う。
-<p>
-復元では接続先と形式の指定が重要。SQLはpsqlで流し込み、カスタム形式はpg_restoreを使う。
+復元では接続先と形式の指定が重要です。SQLは psql で流し込み、カスタム形式は pg_restore を使います。
 </p>
+<pre><code class="language-bash">
+# SQL形式の復元
+psql -d mydb -f backup.sql
 
-# カスタム形式の復元。必要なテーブルだけ指定も可
+# カスタム形式の復元（必要なテーブルだけ指定も可）
 pg_restore -d mydb -t orders backup.dump
 </code></pre>
 
@@ -145,7 +147,8 @@ SELECT COUNT(*) FROM orders;
 
 <h4>バックアップの保存戦略</h4>
 <p>
-バックアップは1世代だけだと「壊れたバックアップ」しか残らない可能性がある。世代管理と保管先分離でリスクを下げる。
+バックアップを1世代だけ保持すると「壊れたバックアップ」しか残らない可能性があります。
+世代管理と保管先の分離でリスクを下げてください。
 </p>
 <ul>
   <li>複数世代を保持。日次×7、週次×4 など</li>
@@ -165,7 +168,7 @@ pg_dump -d mydb -F c -f /backup/dumps/mydb_20260129.dump \
 
 <h4>よくある疑問：論理バックアップだけで十分？</h4>
 <p>
-論理バックアップは時点指定の復旧には対応できない。PITRには<strong>物理バックアップ + WAL</strong>が必須。
+論理バックアップだけでは時点指定の復旧に対応できません。PITRには<strong>物理バックアップ + WAL</strong>が必須です。
 </p>
 
 <h4>論理バックアップの代表例</h4>
@@ -284,15 +287,16 @@ WALが残っていても<span class="highlight">WALだけでは復旧できな�
 
 <h3>3.3 ベースバックアップの役割</h3>
 <p>
-WALだけでは復旧できない。<span class="highlight-strong">起点となるスナップショット</span>が必要であり、WALは差分のため完全コピーがなければ復元できない。
+WALだけでは復旧できません。<span class="highlight-strong">起点となるスナップショット</span>が必要です。
+WALは差分情報のため、完全コピーがなければ復元できません。
 </p>
 <p>
-ベースバックアップが古いと復旧が長引くため、<span class="highlight">取得間隔の見直し</span>が重要。
+ベースバックアップが古いと復旧が長引くため、<span class="highlight">取得間隔の見直し</span>が重要です。
 </p>
 
 <h3>3.4 復旧ターゲットの種類</h3>
 <p>
-PITRは時刻以外にも停止位置を指定できる。
+PITRは時刻以外にも停止位置を指定できます。
 </p>
 <ul>
   <li>recovery_target_time：時刻指定。直感的</li>
@@ -339,8 +343,8 @@ Timeline 2:               ----D----E----(復旧後の新しい履歴)
 
 <h3>3.5 「ダンプ復元」との違い</h3>
 <p>
-pg_dump + psql の復元は「その時点の状態に戻す」だけで、時点指定ができない。
-PITRは「誤操作直前」など細かい時点に戻せる点が大きな違い。
+pg_dump + psql の復元は「その時点の状態に戻す」方式で、時点指定はできません。
+PITRは「誤操作直前」など細かい時点に戻せる点が大きな違いです。
 </p>
 
 <h3>3.6 運用での考え方</h3>
@@ -516,7 +520,7 @@ wal_level = replica
 </div>
 
 <h3>4.3 ベースバックアップの取得</h3>
-<p>ベースバックアップは復旧の起点になる。まずは取得しておく。</p>
+<p>ベースバックアップは復旧の起点です。まず取得してください。</p>
 <pre><code class="language-bash">
 pg_basebackup -D /backup/base -Fp -Xs -P
 </code></pre>
@@ -553,7 +557,7 @@ ls -la /backup/wal_archive
 </code></pre>
 
 <h3>4.5 障害発生の再現</h3>
-<p>削除直前の時刻を記録しておく。復旧ターゲットになる。</p>
+<p>削除直前の時刻を記録してください。復旧ターゲットとして使用します。</p>
 <pre><code class="language-sql">
 SELECT now();
 SELECT * FROM pitr_demo ORDER BY id;
@@ -583,7 +587,7 @@ recovery_target_action = 'promote'
 restore_command = 'cp /backup/wal_archive/%f %p'
 </code></pre>
 <p>
-ここでパスを間違えると、<span class="highlight">無言で復旧が進まない</span>ことがある。ログ確認はセット。
+ここでパスを間違えると、<span class="highlight">無言で復旧が進まない</span>ことがあります。ログ確認を必ずセットで実施してください。
 </p>
 
 <h4>4.6.3 復旧シグナルの用意</h4>
@@ -628,12 +632,12 @@ SELECT pg_last_xact_replay_timestamp();
 
 <h2>5. 注意点</h2>
 <ul>
-  <li>アーカイブ先のパスが存在しない／権限がない</li>
-  <li>archive_command が失敗している。ログで確認</li>
-  <li>recovery_target_time の形式ミス</li>
-  <li>ベースバックアップ取得後にWALが欠落している</li>
-  <li>復旧後の起動が終了しない。ターゲット時刻未到達</li>
-  <li>復旧後にアプリが動かない。<span class="highlight">接続先が旧DBのまま</span></li>
+  <li>アーカイブ先のパスと権限を確認する。</li>
+  <li>archive_command の成否をログで確認する。</li>
+  <li>recovery_target_time の形式を確認する。</li>
+  <li>ベースバックアップ取得後のWAL欠落有無を確認する。</li>
+  <li>復旧後に起動が完了しない場合はターゲット時刻到達を確認する。</li>
+  <li>復旧後にアプリが動かない場合は<span class="highlight">接続先が旧DBのまま</span>でないか確認する。</li>
 </ul>
 
 <h3>5.1 失敗体験</h3>
@@ -667,7 +671,7 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
 
 <h2>6. 定着確認</h2>
 <p>
-以下の空欄補充を使って、PITRの要点を確認してください。
+以下の空欄補充で、PITRの要点を確認する。
 </p>
 <ol>
   <li>ベースバックアップは<span class="masked">起点となる完全コピー</span>、WALアーカイブは<span class="masked">更新履歴の保管</span>を表す。</li>
@@ -877,7 +881,7 @@ SELECT pg_wal_replay_resume();
 
 <h3>まとめと復習</h3>
 <p>
-今回の講義の要点を復習しましょう。黄色い部分をクリックすると正解が表示されます。
+本講義の要点を復習する。黄色部分をクリックすると正解が表示される。
 </p>
 <ul>
   <li>PITRを実現するには、ベースバックアップと <span class="masked">WALアーカイブ</span> の両方が必須です。</li>

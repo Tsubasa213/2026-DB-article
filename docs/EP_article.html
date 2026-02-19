@@ -117,9 +117,9 @@ ANALYZE orders;
 
 <h3>2.3 測定時の注意</h3>
 <ul>
-  <li>初回実行はディスクI/Oの影響を受ける（キャッシュが温まっていない）</li>
-  <li>同じSQLを複数回実行し、中央値を比較する</li>
-  <li>EXPLAIN だけでなく EXPLAIN ANALYZE を確認する</li>
+  <li>初回実行の結果を確認し、ディスクI/O影響（キャッシュ未温）を切り分けます。</li>
+  <li>同じSQLを複数回実行し、中央値を比較します。</li>
+  <li>EXPLAIN だけで終えず、EXPLAIN ANALYZE で実測を確認します。</li>
 </ul>
 
 <div class="column">
@@ -177,6 +177,43 @@ status列にインデックスがない場合、通常は Seq Scan が選ばれ�
 cost は時間（ms）そのものではなく、プランナ内部の評価値です。したがって cost が半分でも、実行時間が半分になるとは限りません。
 ただし同一環境・同一時点で候補プランを比べる指標としては有効です。
 </p>
+
+<h3>3.5 標準分析テンプレート（まずこれを実行）</h3>
+<p>
+クエリが遅いと感じたら、最初に次のテンプレートを実行してください。<span class="highlight">実行計画・統計情報・インデックス定義</span>を同時に確認できます。
+</p>
+<pre><code class="language-sql">
+-- 1) 対象SQLの実測計画を取得
+EXPLAIN (ANALYZE, BUFFERS, VERBOSE)
+SELECT o.order_id, o.customer_id, o.amount
+FROM orders o
+WHERE o.status = 'paid'
+  AND o.order_date &gt;= current_date - 30;
+
+-- 2) 統計情報（偏り・distinct）を確認
+SELECT schemaname, tablename, attname, n_distinct, most_common_vals, most_common_freqs
+FROM pg_stats
+WHERE tablename = 'orders'
+  AND attname IN ('status', 'order_date', 'shipping_pref');
+
+-- 3) インデックス定義を確認
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE tablename = 'orders'
+ORDER BY indexname;
+
+-- 4) テーブル統計の更新時刻・件数感を確認
+SELECT relname, n_live_tup, n_dead_tup, last_analyze, last_autoanalyze
+FROM pg_stat_user_tables
+WHERE relname IN ('orders', 'customers');
+</code></pre>
+
+<div class="column">
+  <div class="column-title">テンプレート運用のコツ</div>
+  <p class="column-note">
+    取得した結果は、<span class="highlight">rows推定誤差</span>、<span class="highlight">buffers read/hit</span>、<span class="highlight">利用インデックス</span>の3軸で並べて比較してください。
+  </p>
+</div>
 
 <details>
   <summary>補足：BUFFERSオプションで何が分かるか</summary>
@@ -441,11 +478,58 @@ Hash Join と Nested Loop の選択は、外側行数推定に強く依存しま
 
 <h3>7.4 計画比較の型を作る</h3>
 <ul>
-  <li>同一SQLを3回実行し中央値を見る</li>
-  <li>ANALYZE前後で rows 誤差を比較する</li>
-  <li>インデックス追加前後で Node構成を比較する</li>
-  <li>BUFFERS read/hit の変化を記録する</li>
+  <li>同一SQLを3回実行し、中央値を比較します。</li>
+  <li>ANALYZE前後で rows 誤差を比較します。</li>
+  <li>インデックス追加前後で Node構成を比較します。</li>
+  <li>BUFFERS read/hit の変化を記録し、要因を切り分けます。</li>
 </ul>
+
+<h3>7.5 失敗体験：インデックスがあるのに遅いケースを再現する</h3>
+<p>
+ここでは「あえて遅い状態」を作り、<span class="highlight">統計情報が古いと最悪の計画が選ばれる</span>ケースを再現します。
+</p>
+<div class="column">
+  <div class="column-title">演習ステップ</div>
+  <ul class="column-note">
+    <li>ステップ1：現状を確認する（基準の実行計画と時間を記録する）。</li>
+    <li>ステップ2：偏った更新を大量実行し、ANALYZEせずに計画悪化を観測する。</li>
+    <li>ステップ3：ANALYZE後に再実行し、計画と実行時間の回復を比較する。</li>
+  </ul>
+</div>
+<pre><code class="language-sql">
+-- ステップ1: 基準計測
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, amount
+FROM orders
+WHERE status = 'canceled'
+  AND order_date &gt;= current_date - 30
+ORDER BY order_date DESC
+LIMIT 200;
+
+-- ステップ2: 分布を意図的に崩す（統計は更新しない）
+UPDATE orders
+SET status = 'canceled'
+WHERE order_id % 10 &lt; 8;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, amount
+FROM orders
+WHERE status = 'canceled'
+  AND order_date &gt;= current_date - 30
+ORDER BY order_date DESC
+LIMIT 200;
+
+-- ステップ3: 統計更新後に再比較
+ANALYZE orders;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, amount
+FROM orders
+WHERE status = 'canceled'
+  AND order_date &gt;= current_date - 30
+ORDER BY order_date DESC
+LIMIT 200;
+</code></pre>
 
 <details>
   <summary>補足：pg_stat_statementsとの併用</summary>
@@ -463,19 +547,19 @@ Hash Join と Nested Loop の選択は、外側行数推定に強く依存しま
 
 <h2>8. 定着確認</h2>
 <p>
-黄色部分をクリックして答えを確認してください。
+以下の穴埋めで、実行計画読解の要点を確認する。
 </p>
 <ul>
-  <li>EXPLAIN の rows は<span class="masked">推定行数</span>、EXPLAIN ANALYZE の actual rows は実測行数です。</li>
-  <li>条件選択性が低いと、インデックスがあっても<span class="masked">Seq Scan</span>が選ばれることがある。</li>
-  <li>大量更新後に計画が不安定なら、まず<span class="masked">ANALYZE</span>を疑う。</li>
-  <li>同一計画なのに遅い場合、原因候補として<span class="masked">キャッシュ状態やI/O待ち</span>を確認してください。</li>
+  <li>EXPLAIN の rows は<span class="masked">推定行数</span>であり、EXPLAIN ANALYZE の actual rows は実測行数である。</li>
+  <li>条件選択性が低い場合、インデックスがあっても<span class="masked">Seq Scan</span>が選ばれることがある。</li>
+  <li>大量更新後に計画が不安定なら、最初に<span class="masked">ANALYZE</span>を疑うべきである。</li>
+  <li>同一計画なのに遅い場合、<span class="masked">キャッシュ状態やI/O待ち</span>を確認する。</li>
   <li>複合インデックスは列順が重要で、先頭列条件がないと<span class="masked">効きにくい</span>。</li>
 </ul>
 
 <h3>8.1 ○×チェック</h3>
 <ul>
-  <li>cost は実行時間(ms)と完全に一致する。→ <span class="masked">×</span></li>
+  <li>cost は実行時間(ms)と完全一致する。→ <span class="masked">×</span></li>
   <li>Index Scan は常に Seq Scan より速い。→ <span class="masked">×</span></li>
   <li>rows 推定誤差は JOIN 方式選択に影響する。→ <span class="masked">○</span></li>
   <li>BUFFERS で read/hit を確認できる。→ <span class="masked">○</span></li>
@@ -494,18 +578,47 @@ Hash Join と Nested Loop の選択は、外側行数推定に強く依存しま
 <details>
   <summary>演習：レビューコメントを書く想定で説明してみましょう</summary>
   <p>
-    「現状」「課題」「改善案」「再検証方法」の4点で短く書くと、チーム内で共有しやすくなります。
+    「現状」「課題」「改善案」「再検証方法」の4点で短く書く。レビュー品質の標準化につながる。
   </p>
 </details>
 
 <h2>9. SQLドリルと解答例</h2>
 <p>
-実行計画を読む練習として、短い課題を解きます。まず自分で EXPLAIN ANALYZE を実行し、次に解答例を確認してください。
+実行計画を読む練習として、各課題をステップ形式で実施します。
 </p>
 
+<div class="column">
+  <div class="column-title">環境再構築の案内</div>
+  <p class="column-note">
+    演習でテーブル状態が崩れた場合は、<span class="highlight">from-teacher/10/create-x_db.sql</span> を実行して初期状態へ戻してください。
+    例：<span class="highlight">npm run sql from-teacher/10/create-x_db.sql</span>
+  </p>
+</div>
+
+<div class="column">
+  <div class="column-title">ドリルの進め方（共通）</div>
+  <ul class="column-note">
+    <li>ステップ1：現状確認（クエリ遅延と実行計画を観測する）。</li>
+    <li>ステップ2：仮説と対策（インデックス追加・統計更新・SQL書き換えを試す）。</li>
+    <li>ステップ3：事後検証（改善後の計画と実行時間を比較する）。</li>
+  </ul>
+</div>
+
 <h3>ドリル1：選択性を見抜く</h3>
-<p><strong>課題</strong>：status='paid' と status='canceled' の計画差を比較し、理由を述べる。</p>
+<p><strong>課題</strong>：status='paid' と status='canceled' の計画差を比較し、理由を説明します。</p>
 <pre><code class="language-sql">
+-- ステップ1: 現状確認
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE status = 'paid';
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE status = 'canceled';
+
+-- ステップ2: 仮説と対策（statusインデックスを追加）
+CREATE INDEX IF NOT EXISTS idx_orders_status_drill ON orders(status);
+ANALYZE orders;
+
+-- ステップ3: 事後検証
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT * FROM orders WHERE status = 'paid';
 
@@ -514,17 +627,39 @@ SELECT * FROM orders WHERE status = 'canceled';
 </code></pre>
 <details>
   <summary>解答例を見る</summary>
-  <p>
-  paid が高頻度なら Seq Scan になりやすく、canceled が低頻度なら Index Scan になりやすいです。分岐理由は条件選択性です。
-  </p>
+  <pre><code class="language-sql">
+-- 解答例（そのまま実行可能）
+CREATE INDEX IF NOT EXISTS idx_orders_status_drill ON orders(status);
+ANALYZE orders;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE status = 'paid';
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE status = 'canceled';
+
+-- 観察ポイント:
+-- paid が高頻度なら Seq Scan が選ばれやすい
+-- canceled が低頻度なら Index Scan / Bitmap 系が選ばれやすい
+  </code></pre>
 </details>
 
 <h3>ドリル2：複合インデックスの列順</h3>
-<p><strong>課題</strong>：以下2本のインデックスの効き方を比較してください。</p>
+<p><strong>課題</strong>：2本の複合インデックスの効き方を比較します。</p>
 <pre><code class="language-sql">
-CREATE INDEX idx_a ON orders(status, order_date);
-CREATE INDEX idx_b ON orders(order_date, status);
+-- ステップ1: 現状確認
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id
+FROM orders
+WHERE status = 'paid'
+  AND order_date &gt;= date '2025-01-01';
 
+-- ステップ2: 仮説と対策
+CREATE INDEX IF NOT EXISTS idx_a ON orders(status, order_date);
+CREATE INDEX IF NOT EXISTS idx_b ON orders(order_date, status);
+ANALYZE orders;
+
+-- ステップ3: 事後検証
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT order_id
 FROM orders
@@ -533,15 +668,54 @@ WHERE status = 'paid'
 </code></pre>
 <details>
   <summary>解答例を見る</summary>
-  <p>
-  status 条件が常に存在するなら (status, order_date) が有利になりやすいです。実運用では実際のクエリ頻度で判断してください。
-  </p>
+  <pre><code class="language-sql">
+-- 解答例（そのまま実行可能）
+DROP INDEX IF EXISTS idx_a;
+DROP INDEX IF EXISTS idx_b;
+
+CREATE INDEX idx_a ON orders(status, order_date);
+CREATE INDEX idx_b ON orders(order_date, status);
+ANALYZE orders;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id
+FROM orders
+WHERE status = 'paid'
+  AND order_date &gt;= date '2025-01-01';
+
+-- 観察ポイント:
+-- status条件が固定で存在するなら idx_a が有利になりやすい
+  </code></pre>
 </details>
 
 <h3>ドリル3：統計誤差の修正</h3>
-<p><strong>課題</strong>：偏った更新後に rows 推定が外れたケースを、ANALYZE で改善してください。</p>
+<p><strong>課題</strong>：偏った更新後に rows 推定が外れたケースを、ANALYZEで改善します。</p>
 <pre><code class="language-sql">
-UPDATE orders SET shipping_pref = 'tokyo' WHERE order_id % 5 = 0;
+-- ステップ1: 現状確認
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE shipping_pref = 'tokyo';
+
+-- ステップ2: 仮説と対策（分布を偏らせた直後、統計未更新の状態を作る）
+UPDATE orders
+SET shipping_pref = 'tokyo'
+WHERE order_id % 5 = 0;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE shipping_pref = 'tokyo';
+
+ANALYZE orders;
+
+-- ステップ3: 事後検証
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE shipping_pref = 'tokyo';
+</code></pre>
+<details>
+  <summary>解答例を見る</summary>
+  <pre><code class="language-sql">
+-- 解答例（そのまま実行可能）
+UPDATE orders
+SET shipping_pref = 'tokyo'
+WHERE order_id % 5 = 0;
 
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT * FROM orders WHERE shipping_pref = 'tokyo';
@@ -550,36 +724,83 @@ ANALYZE orders;
 
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT * FROM orders WHERE shipping_pref = 'tokyo';
-</code></pre>
-<details>
-  <summary>解答例を見る</summary>
-  <p>
-  ANALYZE前は rows 推定が外れやすいです。ANALYZE後に推定が実測へ近づけば統計更新不足が主因と判断できます。
-  </p>
+
+-- 観察ポイント:
+-- ANALYZE前後で rows と actual rows の乖離が縮まるか確認する
+  </code></pre>
 </details>
 
 <h3>ドリル4：JOINの計画比較</h3>
-<p><strong>課題</strong>：JOIN条件を変えて Hash Join / Nested Loop の切り替わりを観察してください。</p>
+<p><strong>課題</strong>：JOIN条件を変えて Hash Join / Nested Loop の切り替わりを観察します。</p>
 <pre><code class="language-sql">
+-- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT c.segment, COUNT(*)
 FROM customers c
 JOIN orders o ON o.customer_id = c.customer_id
 WHERE o.status = 'canceled'
 GROUP BY c.segment;
+
+-- ステップ2: 仮説と対策（抽出行数が少ない条件へ変更）
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT c.segment, COUNT(*)
+FROM customers c
+JOIN orders o ON o.customer_id = c.customer_id
+WHERE o.status = 'canceled'
+  AND o.order_date &gt;= current_date - 3
+GROUP BY c.segment;
+
+-- ステップ3: 事後検証（ノード切替を比較）
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT c.segment, COUNT(*)
+FROM customers c
+JOIN orders o ON o.customer_id = c.customer_id
+WHERE o.status = 'paid'
+GROUP BY c.segment;
 </code></pre>
 <details>
   <summary>解答例を見る</summary>
-  <p>
-  抽出行が少なければ Nested Loop が有利な場面があります。対象行が増えると Hash Join が優勢になりやすいです。
-  </p>
+  <pre><code class="language-sql">
+-- 解答例（そのまま実行可能）
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT c.segment, COUNT(*)
+FROM customers c
+JOIN orders o ON o.customer_id = c.customer_id
+WHERE o.status = 'canceled'
+  AND o.order_date &gt;= current_date - 3
+GROUP BY c.segment;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT c.segment, COUNT(*)
+FROM customers c
+JOIN orders o ON o.customer_id = c.customer_id
+WHERE o.status = 'paid'
+GROUP BY c.segment;
+
+-- 観察ポイント:
+-- 抽出行が少ない場合は Nested Loop が有利になる場面がある
+-- 対象行が増えると Hash Join が優勢になりやすい
+  </code></pre>
 </details>
 
 <h3>ドリル5：ORDER BYとインデックス</h3>
-<p><strong>課題</strong>：並び替えに対するインデックス効果を確認してください。</p>
+<p><strong>課題</strong>：並び替えに対するインデックス効果を確認します。</p>
 <pre><code class="language-sql">
-CREATE INDEX idx_orders_date_desc ON orders(order_date DESC);
+-- ステップ1: 現状確認
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, order_date, amount
+FROM orders
+WHERE status = 'paid'
+ORDER BY order_date DESC
+LIMIT 100;
 
+-- ステップ2: 仮説と対策（並び替えと条件に合わせた索引）
+CREATE INDEX IF NOT EXISTS idx_orders_status_date_desc
+ON orders(status, order_date DESC)
+INCLUDE (amount);
+ANALYZE orders;
+
+-- ステップ3: 事後検証
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT order_id, order_date, amount
 FROM orders
@@ -589,9 +810,69 @@ LIMIT 100;
 </code></pre>
 <details>
   <summary>解答例を見る</summary>
-  <p>
-  適切なインデックスがあれば Sort コストを抑えられます。LIMIT 併用時は特に差が出やすいです。
-  </p>
+  <pre><code class="language-sql">
+-- 解答例（そのまま実行可能）
+CREATE INDEX IF NOT EXISTS idx_orders_status_date_desc
+ON orders(status, order_date DESC)
+INCLUDE (amount);
+ANALYZE orders;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, order_date, amount
+FROM orders
+WHERE status = 'paid'
+ORDER BY order_date DESC
+LIMIT 100;
+
+-- 観察ポイント:
+-- Sortノードの有無
+-- 実行時間とread/hitの変化
+  </code></pre>
+</details>
+
+<h3>ドリル6：失敗体験（統計が古く最悪計画になる）</h3>
+<p><strong>課題</strong>：統計情報を意図的に古くし、改善前後の計画差を比較します。</p>
+<pre><code class="language-sql">
+-- ステップ1: 現状確認
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
+
+-- ステップ2: 仮説と対策（分布を偏らせ、統計未更新状態を作る）
+UPDATE orders
+SET status = 'new', shipping_pref = 'tokyo'
+WHERE order_id % 9 &lt; 7;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
+
+-- 統計更新で対策
+ANALYZE orders;
+
+-- ステップ3: 事後検証
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
+</code></pre>
+<details>
+  <summary>解答例を見る</summary>
+  <pre><code class="language-sql">
+-- 解答例（そのまま実行可能）
+UPDATE orders
+SET status = 'new', shipping_pref = 'tokyo'
+WHERE order_id % 9 &lt; 7;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
+
+ANALYZE orders;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
+
+-- 観察ポイント:
+-- rows推定誤差の縮小
+-- Node Typeの変化
+-- 実行時間とbuffersの改善
+  </code></pre>
 </details>
 
 <details>
@@ -603,11 +884,11 @@ LIMIT 100;
 
 <h2>10. まとめ</h2>
 <ul>
-  <li>実行計画の読解は「Node・rows誤差・buffers」をセットで見る</li>
-  <li>インデックスは選択性と列順で効果が大きく変わる</li>
-  <li>統計が古いと誤計画が起こるため、ANALYZEの運用が重要</li>
-  <li>体感速度はキャッシュや同時実行の影響を受ける</li>
-  <li>改善施策は「仮説→計画比較→再測定」の順で進める</li>
+  <li>Node・rows誤差・buffers をセットで確認する。</li>
+  <li>選択性と列順を基準にインデックスを比較する。</li>
+  <li>統計が古い場合は ANALYZE を優先して実行する。</li>
+  <li>キャッシュ状態や同時実行の影響を切り分ける。</li>
+  <li>仮説→計画比較→再測定の順で改善する。</li>
 </ul>
 
 <div class="column">

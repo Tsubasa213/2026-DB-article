@@ -64,6 +64,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // 穴埋め回答を含むコピーを防止
+  document.addEventListener("copy", (event) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    const fragment = range.cloneContents();
+    if (fragment.querySelector(".masked:not(.revealed)")) {
+      event.preventDefault();
+    }
+  });
+
   // コードブロックにコピー用ボタンを追加（行を消費しない）
   const codeBlocks = document.querySelectorAll("pre");
   codeBlocks.forEach((pre) => {
