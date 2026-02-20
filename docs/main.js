@@ -3,6 +3,42 @@ document.addEventListener("DOMContentLoaded", () => {
   const menuBtn = document.getElementById("menuBtn");
   if (!menuBtn) return;
 
+  // コラム分類（演習 / SQLドリル / その他）
+  const getNearestHeadingText = (element, headingTag) => {
+    let current = element;
+    const targetTag = headingTag.toLowerCase();
+    while (current) {
+      let sibling = current.previousElementSibling;
+      while (sibling) {
+        if (sibling.tagName?.toLowerCase() === targetTag) {
+          return sibling.textContent?.trim() || "";
+        }
+        sibling = sibling.previousElementSibling;
+      }
+      current = current.parentElement;
+    }
+    return "";
+  };
+
+  const columns = document.querySelectorAll(".column");
+  columns.forEach((column) => {
+    const titleElement = column.querySelector(".column-title");
+    const titleText = titleElement?.textContent?.trim() || "";
+    const nearestH3Text = getNearestHeadingText(column, "h3");
+
+    const isExercise = /^(ウォームアップ演習|追加演習|最終演習|演習[:：]|演習ステップ|ステップ[0-9０-９]|リカバリ課題)/.test(titleText);
+    const isSqlDrill = /^(課題[:：]|ドリル)/.test(titleText) || /^(ex-|ドリル)/i.test(nearestH3Text);
+
+    column.classList.remove("column-exercise", "column-sql-drill", "column-other");
+    if (isSqlDrill) {
+      column.classList.add("column-sql-drill");
+    } else if (isExercise) {
+      column.classList.add("column-exercise");
+    } else {
+      column.classList.add("column-other");
+    }
+  });
+
   // ボタンを3本線に初期化（既存レイアウトは維持）
   if (!menuBtn.querySelector("span")) {
     menuBtn.textContent = "";

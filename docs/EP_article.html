@@ -39,13 +39,13 @@
   </ul>
 </div>
 
-<details>
-  <summary>ウォームアップ演習：実行計画を読むとき最初に見る項目は何ですか？</summary>
-  <p>
+<div class="column">
+  <div class="column-title">ウォームアップ演習：実行計画を読むとき最初に見る項目は何ですか？</div>
+  <p class="column-note">
     最初は Node Type、rows（推定）、actual rows（実測）、loops を見るのがおすすめです。
     この4点で「何を、どれくらい、何回処理したか」を把握しやすくなります。
   </p>
-</details>
+</div>
 
 <h2>2. 実験環境</h2>
 <ul>
@@ -108,12 +108,12 @@ ANALYZE customers;
 ANALYZE orders;
 </code></pre>
 
-<details>
-  <summary>演習：データ件数を半分にすると計画はどう変わりますか？</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：データ件数を半分にすると計画はどう変わりますか？</div>
+  <p class="column-note">
     100万件と50万件で同じSQLを比較してみてください。件数が減ると Seq Scan の優位性が変わる場面があります。
   </p>
-</details>
+</div>
 
 <h3>2.3 測定時の注意</h3>
 <ul>
@@ -171,12 +171,12 @@ status列にインデックスがない場合、通常は Seq Scan が選ばれ�
 行数が増えるほど時間は増加しやすくなります。
 </p>
 
-<details>
-  <summary>演習：rows と actual rows の差はどれくらいなら要注意ですか？</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：rows と actual rows の差はどれくらいなら要注意ですか？</div>
+  <p class="column-note">
     一律の閾値はありませんが、10倍以上の差が続く場合は統計不足や相関の見落としを疑うとよいです。
   </p>
-</details>
+</div>
 
 <h3>3.3 典型ノードの意味</h3>
 <ul>
@@ -240,13 +240,13 @@ WHERE relname IN ('orders', 'customers');
   </p>
 </details>
 
-<details>
-  <summary>演習：同じSQLを3回実行したとき、どの値を比較しますか？</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：同じSQLを3回実行したとき、どの値を比較しますか？</div>
+  <p class="column-note">
     実行時間だけでなく、buffers の read/hit、actual rows、loops も合わせて比較してください。
     ばらつきが小さい条件で比較することが重要です。
   </p>
-</details>
+</div>
 
 <h3>定着確認（第3章）</h3>
 <ul>
@@ -301,15 +301,15 @@ GroupAggregate と HashAggregate のどちらが出るかは、並び順やメ�
   </p>
 </div>
 
-<details>
-  <summary>演習：件数が増えると、どのタイミングでNode Typeが切り替わりますか？</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：件数が増えると、どのタイミングでNode Typeが切り替わりますか？</div>
+  <p class="column-note">
     10万件・50万件・100万件の順に同じSQLを実行し、
     <span class="highlight">どの件数で Seq Scan から Index系ノードへ切り替わったか</span>を確認してください。
     あわせて rows と actual rows の差、実行時間、BUFFERS(read/hit) を表にして比較すると、
     「なぜその計画が選ばれたか」を説明しやすくなります。
   </p>
-</details>
+</div>
 
 <h3>定着確認（第4章）</h3>
 <ul>
@@ -386,19 +386,19 @@ WHERE status = 'canceled';
   </p>
 </details>
 
-<details>
-  <summary>演習：どの条件なら部分インデックスを採用しますか？</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：どの条件なら部分インデックスを採用しますか？</div>
+  <p class="column-note">
     低頻度で、かつ業務上よく検索する条件に向いています。運用前に更新コストも含めて評価してください。
   </p>
-</details>
+</div>
 
-<details>
-  <summary>演習：複合インデックスの列順を逆にしたときの差を観測してください</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：複合インデックスの列順を逆にしたときの差を観測してください</div>
+  <p class="column-note">
     実行時間だけでなく、Node Type・loops・buffers の差を比較して、どちらが目的クエリに適しているか説明してみてください。
   </p>
-</details>
+</div>
 
 <h3>定着確認（第5章）</h3>
 <ul>
@@ -463,19 +463,19 @@ ANALYZE orders;
   </p>
 </div>
 
-<details>
-  <summary>演習：ANALYZE前後でどの列の統計を確認しますか？</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：ANALYZE前後でどの列の統計を確認しますか？</div>
+  <p class="column-note">
     WHERE句やJOIN条件で使う列を優先して確認します。<code>pg_stats</code> の most_common_vals や n_distinct が参考になります。
   </p>
-</details>
+</div>
 
-<details>
-  <summary>演習：extended statistics が有効なケースを挙げてください</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：extended statistics が有効なケースを挙げてください</div>
+  <p class="column-note">
     status と shipping_pref のように、列同士の依存関係が強いケースで効果を発揮しやすいです。
   </p>
-</details>
+</div>
 
 <h3>定着確認（第6章）</h3>
 <ul>
@@ -589,12 +589,12 @@ LIMIT 200;
   </p>
 </div>
 
-<details>
-  <summary>演習：同じ計画なのに遅いとき、最初に何を確認しますか？</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：同じ計画なのに遅いとき、最初に何を確認しますか？</div>
+  <p class="column-note">
     BUFFERSのread/hit、同時実行状況、実行タイミング（バッチ時間帯）を優先的に確認してください。
   </p>
-</details>
+</div>
 
 <p>
 ここまでで「計画の読み方」と「乖離の原因切り分け」を確認できました。
@@ -909,12 +909,12 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
   </code></pre>
 </details>
 
-<details>
-  <summary>追加演習：自分の業務SQLを1本持ち込み、同じ手順で評価してみましょう</summary>
-  <p>
+<div class="column">
+  <div class="column-title">追加演習：自分の業務SQLを1本持ち込み、同じ手順で評価してみましょう</div>
+  <p class="column-note">
     現在の計画、仮説、改善SQL、再測定結果を1セットで残してください。比較可能な記録があると再発防止に役立ちます。
   </p>
-</details>
+</div>
 
 <h3>定着確認（第8章）</h3>
 <ul>

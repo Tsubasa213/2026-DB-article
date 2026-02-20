@@ -332,9 +332,21 @@ summary {
 .column {
   margin: 1.4em 0;
   padding: 0.9em 1.1em;
-  border-left: 6px solid #f59e0b;
+  border-left: none;
   background: #fff7ed;
   border-radius: 6px;
+}
+
+.column.column-sql-drill {
+  background: #fff7ed;
+}
+
+.column.column-exercise {
+  background: #f3e8ff;
+}
+
+.column.column-other {
+  background: #e3f2fd;
 }
 
 .column-title {

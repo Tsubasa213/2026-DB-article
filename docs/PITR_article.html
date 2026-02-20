@@ -14,7 +14,7 @@
   <button class="menu-btn" id="menuBtn">☰</button>
 </header>
 
-<h1>PostgreSQLにおけるPoint In Time Recoveryの実践</h1>
+<h1>PostgreSQLにおけるPoint In Time Recovery</h1>
 
 <h2>1. はじめに</h2>
 <p>
@@ -28,7 +28,6 @@
 <ul>
   <li>PostgreSQL 17 / Docker</li>
   <li>授業提供の演習用コンテナ環境</li>
-  <li>PowerShell / bash どちらでも可</li>
 </ul>
 <p>
 参考リンク：<a href="https://takeshiwada1980.github.io/DB-2025/">DB-2025 講義資料 Index</a>
@@ -83,7 +82,7 @@ pg_dump -d mydb -F c -f backup.dump
 </ul>
 
 <details>
-  <summary>演習：論理バックアップと物理バックアップをどう使い分けますか？</summary>
+  <summary>：論理バックアップと物理バックアップをどう使い分けますか？</summary>
   <p>
     「テーブル単位で戻したいケース」と「障害直後に全体を早く戻したいケース」をそれぞれ想定し、
     どちらの方式を選ぶか理由つきで説明してみてください。
@@ -176,9 +175,9 @@ psql -d mydb -f backup.sql
 
 <h4>復元の時に起きやすいポイント</h4>
 <ul>
-  <li>接続先が間違っていないか。誤って本番へ流さない</li>
-  <li>権限やオーナーの違いで失敗することがある</li>
-  <li>復元後の整合性チェックは<span class="critical-text">必須</span>。件数、主要テーブルの確認</li>
+  <li>接続先を取り違えやすい。実行前にホスト/ポート/DB名を再確認し、誤って本番へ流し込まない</li>
+  <li>権限やオーナーの差分で復元が失敗しやすい。事前にロールと所有者の整合を確認する</li>
+  <li>復元後の確認を省略しやすい。<span class="critical-text">件数</span>と<span class="critical-text">主要テーブルの存在</span>を必ず確認する</li>
 </ul>
 
 <p>
@@ -280,12 +279,12 @@ WALが残っていても<span class="highlight">WALだけでは復旧できな�
   </p>
 </div>
 
-<details>
-  <summary>演習：WALだけで復旧できない理由を説明してください</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：WALだけで復旧できない理由を説明してください</div>
+  <p class="column-note">
     「完全コピーがない状態」と「完全コピーがある状態」で、復旧できる範囲がどう違うかを比較して説明してください。
   </p>
-</details>
+</div>
 
 <h3>3.3 ベースバックアップの役割</h3>
 <p>
@@ -587,13 +586,13 @@ wal_level = replica
   </p>
 </div>
 
-<details>
-  <summary>演習：archive_command の失敗をどう切り分けますか？</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：archive_command の失敗をどう切り分けますか？</div>
+  <p class="column-note">
     パス、権限、既存ファイル衝突、ログ出力の4点を順に確認して、
     どこで失敗しているかを1つずつ切り分けてください。
   </p>
-</details>
+</div>
 <div class="column">
   <div class="column-title">参考質問例</div>
   <p class="column-note">
@@ -750,13 +749,13 @@ WALアーカイブを溜め続けるとディスクが溢れます。古いWAL�
 pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
 </code></pre>
 
-<details>
-  <summary>演習：WAL削除の安全条件を説明してください</summary>
-  <p>
+<div class="column">
+  <div class="column-title">演習：WAL削除の安全条件を説明してください</div>
+  <p class="column-note">
     「どのベースバックアップに対して、どの時点まで復旧する可能性があるか」を先に決めると、
     消してよいWALの範囲を説明しやすくなります。
   </p>
-</details>
+</div>
 
 <h3>定着確認（第5章）</h3>
 <ul>
@@ -965,13 +964,13 @@ SELECT pg_wal_replay_resume();
   <li>物理的な破壊（DROP TABLEなど）は、通常の <span class="masked">ROLLBACK</span> では救済できないため、PITRが有効です。</li>
 </ul>
 
-<details>
-  <summary>最終演習：PITR手順を3分で説明してください</summary>
-  <p>
+<div class="column">
+  <div class="column-title">最終演習：PITR手順を3分で説明してください</div>
+  <p class="column-note">
     「起点（ベースバックアップ）」「履歴（WAL）」「停止条件（recovery_target）」の3要素を順番に説明すると、
     実務でも共有しやすい説明になります。
   </p>
-</details>
+</div>
 
 
 <p class="footer-text"><span class="highlight">制作時間：22時間</span></p>
