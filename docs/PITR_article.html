@@ -801,14 +801,14 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
 
 <h2>6. SQLドリル / 演習の準備</h2>
 <p>
-本演習は、<code>test-sql/create-x_db.sql</code> で定義される実スキーマ（<code>x_jobs</code> / <code>x_characters</code> / <code>x_guilds</code> / <code>x_guild_characters</code> / <code>x_items</code> / <code>x_character_items</code> / <code>x_gold_transfers</code>）を前提に進めます。
+本演習は、<code>from-teacher/10/create-x_db.sql</code> で定義される実スキーマ（<code>x_jobs</code> / <code>x_characters</code> / <code>x_guilds</code> / <code>x_guild_characters</code> / <code>x_items</code> / <code>x_character_items</code> / <code>x_gold_transfers</code>）を前提に進めます。
 本章では、誤操作を意図的に発生させ、PITRで戻す手順を確認します。
 </p>
 
 <div class="column">
   <div class="column-title">ER図（create-x_db.sql対応）</div>
   <p class="column-note">
-    以下は <code>test-sql/create-x_db.sql</code> に対応するER図です。ドリル前にテーブル関連を確認してください。
+    以下は <code>from-teacher/10/create-x_db.sql</code> に対応するER図です。ドリル前にテーブル関連を確認してください。
   </p>
   <img src="../images/LER-01.png" alt="create-x_db.sql のER図" />
 </div>
@@ -827,7 +827,7 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
     演習結果で状態が不明になった場合は、次のコマンドでスキーマを再作成してください。
   </p>
   <pre><code class="language-bash">
-npm run sql test-sql/create-x_db.sql
+npm run sql from-teacher/10/create-x_db.sql
   </code></pre>
 </div>
 
