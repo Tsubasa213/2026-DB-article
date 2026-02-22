@@ -639,7 +639,7 @@ Nested Loopが選ばれて内側アクセスが過剰に発生することがあ
   <li>BUFFERS read/hit の変化を記録し、要因を切り分けます。</li>
 </ul>
 
-<h3>7.5 失敗体験：インデックスがあるのに遅いケースを再現する</h3>
+<h3>7.5 インデックスがあるのに遅いケースを再現する</h3>
 <p>
 ここでは「あえて遅い状態」を作り、<span class="highlight">統計情報が古いと最悪の計画が選ばれる</span>ケースを再現します。
 </p>
@@ -721,9 +721,14 @@ LIMIT 200;
   <li>継続監視には <span class="masked">pg_stat_statements</span> の併用が有効である。</li>
 </ul>
 
-<h2>8. SQLドリルと解答例</h2>
+<h2>8. SQLドリル</h2>
 <p>
 実行計画を読む練習として、各課題をステップ形式で実施します。
+</p>
+<p>
+本章は、これまでの講義のように「正しいSQLを書く」ドリルではありません。用意されたSQLを実行し、
+出力された実行計画（EXPLAINの結果）を読み解いて、<span class="highlight-strong">なぜその結果になったのかを考察する分析レポートを書く</span>練習です。
+「どの指標が、どのように変化したか」を根拠つきで説明してください。
 </p>
 
 <div class="column">
@@ -753,8 +758,13 @@ LIMIT 200;
   </ul>
 </div>
 
-<h3>ドリル1：選択性を見抜く</h3>
-<p><strong>課題</strong>：status='paid' と status='canceled' の計画差を比較し、理由を説明してください。</p>
+<h3>ex-01.sql：status条件の選択性差を比較し、実行計画の違いを説明してください。</h3>
+<p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
+<ol>
+  <li>インデックス追加後、<code>status='paid'</code> と <code>status='canceled'</code> で、それぞれどの <code>Node Type</code> が選ばれましたか。</li>
+  <li>なぜ異なる <code>Node Type</code> が選ばれたと推測できますか。<span class="highlight">選択性（データ頻度）</span>という言葉を使って説明してください。</li>
+  <li><code>BUFFERS</code>（read/hit）と実行時間の関係から、どちらの条件でインデックス効果が高かったかを述べてください。</li>
+</ol>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -777,7 +787,7 @@ SELECT * FROM orders WHERE status = 'canceled';
 <details>
   <summary>解答例を見る</summary>
   <pre><code class="language-sql">
--- 解答例（そのまま実行可能）
+-- 解答例
 CREATE INDEX IF NOT EXISTS idx_orders_status_drill ON orders(status);
 ANALYZE orders;
 
@@ -791,10 +801,24 @@ SELECT * FROM orders WHERE status = 'canceled';
 -- paid が高頻度なら Seq Scan が選ばれやすい
 -- canceled が低頻度なら Index Scan / Bitmap 系が選ばれやすい
   </code></pre>
+  <p>
+  解説：選択性の高低でプランナの判断は変わります。インデックス追加前後の Node Type と BUFFERS をセットで比較してください。
+  </p>
+  <p><strong>解答例</strong></p>
+  <p>
+  1. <code>paid</code> では <code>Seq Scan</code>、<code>canceled</code> では <code>Index Scan</code>（または <code>Bitmap Heap Scan</code>）が選ばれました。<br>
+  2. 理由は選択性の差です。<code>paid</code> は該当件数が多く、全表走査の方が有利になりやすい一方、<code>canceled</code> は低頻度でインデックスアクセスが効きやすいためです。<br>
+  3. <code>canceled</code> 側では read が抑えられ、実行時間も短縮しやすいことを確認できました。
+  </p>
 </details>
 
-<h3>ドリル2：複合インデックスの列順</h3>
-<p><strong>課題</strong>：2本の複合インデックスの効き方を比較してください。</p>
+<h3>ex-02.sql：複合インデックスの列順差を比較し、最適な列順を説明してください。</h3>
+<p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
+<ol>
+  <li><code>idx_a(status, order_date)</code> と <code>idx_b(order_date, status)</code> のうち、対象SQLで実際に利用されやすかったのはどちらですか。</li>
+  <li>その結果を、<span class="highlight">先頭列</span>という言葉を使って説明してください。</li>
+  <li><code>Node Type</code>、実行時間、<code>BUFFERS</code> を比較し、どちらが実務上の採用候補かを述べてください。</li>
+</ol>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -818,7 +842,7 @@ WHERE status = 'paid'
 <details>
   <summary>解答例を見る</summary>
   <pre><code class="language-sql">
--- 解答例（そのまま実行可能）
+-- 解答例
 DROP INDEX IF EXISTS idx_a;
 DROP INDEX IF EXISTS idx_b;
 
@@ -835,10 +859,24 @@ WHERE status = 'paid'
 -- 観察ポイント:
 -- status条件が固定で存在するなら idx_a が有利になりやすい
   </code></pre>
+  <p>
+  解説：複合インデックスは先頭列が重要です。WHERE句で先頭列を固定できる構成ほど効きやすくなります。
+  </p>
+  <p><strong>解答例</strong></p>
+  <p>
+  1. 対象SQLでは <code>idx_a(status, order_date)</code> の方が使われやすい結果でした。<br>
+  2. 理由は先頭列に <code>status</code> を置けており、WHERE句の等価条件に一致するためです。<br>
+  3. 実行時間とBUFFERSでも <code>idx_a</code> 側が有利で、現行SQLにはこちらを採用すべきと判断しました。
+  </p>
 </details>
 
-<h3>ドリル3：統計誤差の修正</h3>
-<p><strong>課題</strong>：偏った更新後に rows 推定が外れたケースを、ANALYZEで改善してください。</p>
+<h3>ex-03.sql：統計誤差を再現し、ANALYZEで推定精度を回復してください。</h3>
+<p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
+<ol>
+  <li><code>ANALYZE</code> 前後で <code>rows</code> と <code>actual rows</code> の差はどう変化しましたか。</li>
+  <li>この変化を、<span class="highlight">統計情報の鮮度</span>という言葉を使って説明してください。</li>
+  <li><code>Node Type</code> や実行時間に改善が見られたかを、数値を挙げて記述してください。</li>
+</ol>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -861,7 +899,7 @@ SELECT * FROM orders WHERE shipping_pref = 'tokyo';
 <details>
   <summary>解答例を見る</summary>
   <pre><code class="language-sql">
--- 解答例（そのまま実行可能）
+-- 解答例
 UPDATE orders
 SET shipping_pref = 'tokyo'
 WHERE order_id % 5 = 0;
@@ -877,10 +915,24 @@ SELECT * FROM orders WHERE shipping_pref = 'tokyo';
 -- 観察ポイント:
 -- ANALYZE前後で rows と actual rows の乖離が縮まるか確認する
   </code></pre>
+  <p>
+  解説：本問の主眼は rows 推定誤差の観測です。ANALYZE前後で rows と actual rows の差が縮むかを確認してください。
+  </p>
+  <p><strong>解答例</strong></p>
+  <p>
+  1. <code>ANALYZE</code> 前は rows 推定と actual rows の乖離が大きく、実態と計画がずれていました。<br>
+  2. <code>ANALYZE</code> 後は統計情報の鮮度が回復し、rows 推定が actual rows に近づきました。<br>
+  3. その結果、Node選択と実行時間が安定し、計画の妥当性が改善しました。
+  </p>
 </details>
 
-<h3>ドリル4：JOINの計画比較</h3>
-<p><strong>課題</strong>：JOIN条件を変えて Hash Join / Nested Loop の切り替わりを観察してください。</p>
+<h3>ex-04.sql：JOIN条件変更による Hash Join と Nested Loop の切替を比較してください。</h3>
+<p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
+<ol>
+  <li>各ステップで選ばれたJOINノード（<code>Hash Join</code> / <code>Nested Loop</code>）を整理してください。</li>
+  <li>JOIN方式の変化を、<span class="highlight">入力行数（外側行数）</span>という言葉を使って説明してください。</li>
+  <li><code>loops</code> と実行時間の関係から、どの条件が最も効率的だったかを述べてください。</li>
+</ol>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -910,7 +962,7 @@ GROUP BY c.segment;
 <details>
   <summary>解答例を見る</summary>
   <pre><code class="language-sql">
--- 解答例（そのまま実行可能）
+-- 解答例
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT c.segment, COUNT(*)
 FROM customers c
@@ -930,10 +982,24 @@ GROUP BY c.segment;
 -- 抽出行が少ない場合は Nested Loop が有利になる場面がある
 -- 対象行が増えると Hash Join が優勢になりやすい
   </code></pre>
+  <p>
+  解説：JOIN方式は入力行数の見積もりに強く依存します。条件を変えて対象件数を動かし、ノード切替を確認してください。
+  </p>
+  <p><strong>解答例</strong></p>
+  <p>
+  1. 抽出件数が少ない条件では <code>Nested Loop</code>、件数が増える条件では <code>Hash Join</code> が選ばれました。<br>
+  2. 理由は入力行数の差です。外側行数が小さいと逐次探索が有利ですが、行数が増えるとハッシュ結合が有利になります。<br>
+  3. loops と実行時間を比較すると、対象行が少ない条件で最も効率が高いことを確認できました。
+  </p>
 </details>
 
-<h3>ドリル5：ORDER BYとインデックス</h3>
-<p><strong>課題</strong>：並び替えに対するインデックス効果を確認してください。</p>
+<h3>ex-05.sql：ORDER BY最適化のための索引を追加し、Sort有無を比較してください。</h3>
+<p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
+<ol>
+  <li>インデックス追加前後で <code>Sort</code> ノードの有無はどう変化しましたか。</li>
+  <li>その変化を、<span class="highlight">ORDER BY とインデックス列順の一致</span>という言葉を使って説明してください。</li>
+  <li><code>BUFFERS</code> と実行時間から、改善が確認できたかを結論づけてください。</li>
+</ol>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -960,7 +1026,7 @@ LIMIT 100;
 <details>
   <summary>解答例を見る</summary>
   <pre><code class="language-sql">
--- 解答例（そのまま実行可能）
+-- 解答例
 CREATE INDEX IF NOT EXISTS idx_orders_status_date_desc
 ON orders(status, order_date DESC)
 INCLUDE (amount);
@@ -977,10 +1043,24 @@ LIMIT 100;
 -- Sortノードの有無
 -- 実行時間とread/hitの変化
   </code></pre>
+  <p>
+  解説：ORDER BY と WHERE の両方に合う索引を用意すると、Sortコストを削減できる場合があります。Sortノード有無を必ず確認してください。
+  </p>
+  <p><strong>解答例</strong></p>
+  <p>
+  1. インデックス追加後は <code>Sort</code> ノードが消える（または負荷が低下する）結果になりました。<br>
+  2. 理由は ORDER BY 方向とインデックス列順が一致し、並べ替え処理を省略しやすくなったためです。<br>
+  3. 実行時間とBUFFERSの両方で改善が見られ、索引追加の効果を確認できました。
+  </p>
 </details>
 
-<h3>ドリル6：失敗体験（統計が古く最悪計画になる）</h3>
-<p><strong>課題</strong>：統計情報を意図的に古くし、改善前後の計画差を比較してください。</p>
+<h3>ex-06.sql：統計情報を古い状態にして計画悪化を再現し、改善差を比較してください。</h3>
+<p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
+<ol>
+  <li>統計更新前後で <code>rows</code> 推定誤差はどの程度変化しましたか。</li>
+  <li><code>Node Type</code> と実行時間はどう変化しましたか。改善/悪化を具体的に書いてください。</li>
+  <li>この結果を、<span class="highlight">統計情報の更新タイミング</span>という言葉を使って説明してください。</li>
+</ol>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -1004,7 +1084,7 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
 <details>
   <summary>解答例を見る</summary>
   <pre><code class="language-sql">
--- 解答例（そのまま実行可能）
+-- 解答例
 UPDATE orders
 SET status = 'new', shipping_pref = 'tokyo'
 WHERE order_id % 9 &lt; 7;
@@ -1022,6 +1102,15 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
 -- Node Typeの変化
 -- 実行時間とbuffersの改善
   </code></pre>
+  <p>
+  解説：統計が古い状態では不利な計画が選ばれることがあります。ANALYZE後に Node Type と BUFFERS の改善を比較してください。
+  </p>
+  <p><strong>解答例</strong></p>
+  <p>
+  1. 統計更新前は rows 推定誤差が大きく、実態と乖離した計画が選ばれていました。<br>
+  2. <code>ANALYZE</code> 後は推定誤差が縮小し、Node Type と実行時間が改善しました。<br>
+  3. したがって、統計情報の更新タイミングが遅いと性能劣化を招くため、更新後に再計測する運用が必要です。
+  </p>
 </details>
 
 <div class="column">
@@ -1032,7 +1121,7 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
 </div>
 
 <details>
-  <summary>追加演習の解答例（導き方 + サンプル）</summary>
+  <summary>追加演習の解答例</summary>
   <p>
     追加演習は「1本の業務SQLを、同じ条件で前後比較できる形にする」ことが正解です。
     まず現状計測を3回行って中央値を記録し、次に仮説に基づく変更を1つだけ適用して再計測します。
@@ -1076,14 +1165,19 @@ LIMIT 200;
   <li>改善判断は <span class="masked">再現可能な比較結果</span> を根拠に行うべきである。</li>
 </ul>
 
-<h2>EXハンズオン：create-x_db.sql を使った実行計画演習</h2>
+<h2>EXハンズオン：実行計画演習</h2>
 <p>
 本記事の主軸は <code>orders/customers</code> ですが、講義で使うゲームDBでも同じ分析手順を適用できます。
-以下は <code>from-teacher/10/create-x_db.sql</code> を前提にした、任意の補助ドリルです。
+以下は <code>from-teacher/10/create-x_db.sql</code> と <code>from-teacher/10/insert-x_db_01.sql</code> を前提にした、任意の補助ドリルです。
+</p>
+<p>
+このEXハンズオンも「正しいSQLを書く」問題ではありません。用意されたSQLを実行し、
+出力された実行計画（EXPLAINの結果）を読み解いて、<span class="highlight-strong">なぜその計画になったのかを考察する分析レポートを書く</span>練習です。
+Node Type、rows/actual rows、BUFFERS、実行時間を根拠として説明してください。
 </p>
 
 <div class="column">
-  <div class="column-title">ER図（create-x_db.sql）</div>
+  <div class="column-title">ER図</div>
   <p class="column-note">
     参照先テーブルの関係を先に確認してから、JOIN計画と集計計画を読み解いてください。
   </p>
@@ -1096,17 +1190,26 @@ LIMIT 200;
 # スキーマ再作成
 npm run sql from-teacher/10/create-x_db.sql
 
+# 初期データ投入（本ドリルの前提）
+npm run sql from-teacher/10/insert-x_db_01.sql
+
 # 必要なら検証用SQLファイルを開く
 code sql/tmp_ep_xdb.sql
 npm run sql sql/tmp_ep_xdb.sql
   </code></pre>
 </div>
 
-<h3>補助ドリルA：ギルド所属JOINの計画を読む</h3>
+<h3>EXドリル01：ギルド所属JOINの計画を読む</h3>
 <p>
 目的は、<code>x_characters</code> と <code>x_guild_characters</code> のJOINで、
 入力行数に応じてどのノードが選ばれるかを観測することです。
 </p>
+<p><strong>課題</strong>：SQLを実行し、以下の問いに答えてください。</p>
+<ol>
+  <li>JOINノードとして何が選ばれましたか（<code>Nested Loop</code> / <code>Hash Join</code> など）。</li>
+  <li><code>rows</code> と <code>actual rows</code> の差から、推定精度は妥当でしたか。</li>
+  <li>結果を、<span class="highlight">入力行数</span>という言葉を使って説明してください。</li>
+</ol>
 <pre><code class="language-sql">
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT c.character_id, c.name, gc.guild_id
@@ -1132,12 +1235,24 @@ WHERE c.deleted_at IS NULL;
     行数が小さい初期状態では Nested Loop が選ばれやすく、件数増加時は Hash Join へ切り替わる可能性があります。
     切替の有無は統計情報と件数分布で変わるため、実測で確認してください。
   </p>
+  <p><strong>解答例</strong></p>
+  <p>
+  1. 今回の実行では JOIN ノードとして <code>Nested Loop</code>（または <code>Hash Join</code>）が選ばれました。<br>
+  2. <code>rows</code> と <code>actual rows</code> の差は小さく（または大きく）、推定精度は概ね妥当（または改善余地あり）と判断しました。<br>
+  3. 理由は入力行数です。入力行数が少ない条件では逐次探索が有利になりやすく、増えるとハッシュ結合が有利になります。
+  </p>
 </details>
 
-<h3>補助ドリルB：送金履歴の集計計画を読む</h3>
+<h3>EXドリル02：送金履歴の集計計画を読む</h3>
 <p>
 目的は、<code>x_gold_transfers</code> の集計で HashAggregate / GroupAggregate の違いを観測することです。
 </p>
+<p><strong>課題</strong>：SQLを実行し、以下の問いに答えてください。</p>
+<ol>
+  <li>集計ノードとして何が選ばれましたか（<code>HashAggregate</code> / <code>GroupAggregate</code>）。</li>
+  <li><code>Sort</code> ノードの有無と、その影響を実行時間から説明してください。</li>
+  <li>結果を、<span class="highlight">グループ数</span>という言葉を使って説明してください。</li>
+</ol>
 <pre><code class="language-sql">
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT to_character_id, COUNT(*) AS transfer_count, SUM(amount) AS total_amount
@@ -1162,6 +1277,12 @@ ORDER BY transfer_count DESC;
   <p>
     グループ数が少ない場合はHashAggregateが有利になりやすいですが、
     メモリ設定や入力順序によってはGroupAggregateが選ばれることがあります。
+  </p>
+  <p><strong>解答例</strong></p>
+  <p>
+  1. 今回は集計ノードとして <code>HashAggregate</code>（または <code>GroupAggregate</code>）が選ばれました。<br>
+  2. <code>Sort</code> ノードは存在した（または存在しなかった）ため、実行時間に追加コストが発生した（または抑えられた）と判断しました。<br>
+  3. 理由はグループ数です。グループ数が少ない場合はハッシュ集計が有利になりやすく、条件次第で並び替え主体の集計が選ばれることもあります。
   </p>
 </details>
 

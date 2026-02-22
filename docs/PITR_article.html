@@ -803,14 +803,14 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
   <li>復旧後に不整合がある場合は <span class="masked">接続先誤りやWAL欠落</span> を疑う。</li>
 </ul>
 
-<h2>7. SQLドリル / 演習の準備</h2>
+<h2>7. 演習の準備</h2>
 <p>
-本演習は、<code>from-teacher/10/create-x_db.sql</code> で定義される実スキーマ（<code>x_jobs</code> / <code>x_characters</code> / <code>x_guilds</code> / <code>x_guild_characters</code> / <code>x_items</code> / <code>x_character_items</code> / <code>x_gold_transfers</code>）を前提に進めます。
+本演習は、<code>from-teacher/10/create-x_db.sql</code> と <code>from-teacher/10/insert-x_db_01.sql</code> で構築される実データ（<code>x_****</code>）を前提に進めます。
 本章では、誤操作を意図的に発生させ、PITRで戻す手順を確認します。
 </p>
 
 <div class="column">
-  <div class="column-title">ER図（create-x_db.sql対応）</div>
+  <div class="column-title">ER図</div>
   <p class="column-note">
     以下は <code>from-teacher/10/create-x_db.sql</code> に対応するER図です。ドリル前にテーブル関連を確認してください。
   </p>
@@ -820,53 +820,19 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
 <div class="column">
   <div class="column-title">解答例の場所</div>
   <p class="column-note">
-    各演習の解答は <a href="#answers">第9章「演習の解答例」</a> にまとめています。
-    第9章には、各問題について <span class="highlight">コマンド例</span> と <span class="highlight">SQL解答例</span> の両方を掲載しています。
+    各演習の解答は、それぞれの問題ブロック直下にある「<strong>解答例を見る</strong>」内にあります。
+    手順を実行してから、同じ演習内の解答を開いて差分を確認してください。
   </p>
 </div>
 
 <div class="column">
   <div class="column-title">演習環境の再構築</div>
   <p class="column-note">
-    演習結果で状態が不明になった場合は、次のコマンドでスキーマを再作成してください。
+    演習結果で状態が不明になった場合は、次のコマンドでスキーマ作成と初期データ投入をやり直してください。
   </p>
   <pre><code class="language-bash">
 npm run sql from-teacher/10/create-x_db.sql
-  </code></pre>
-</div>
-
-<div class="column">
-  <div class="column-title">最小データの投入（ドリル実行前）</div>
-  <p class="column-note">
-    <code>create-x_db.sql</code> はテーブル定義が中心です。<span class="highlight">実行直後はテーブルが空のため、ドリル検証用の初期データをここで作成します。</span>
-    以下の最小データを入れてからドリルを実施してください。
-  </p>
-  <pre><code class="language-sql">
-INSERT INTO x_jobs (name, attack_gain, defense_gain, magic_gain)
-VALUES
-  ('warrior', 3, 2, 0),
-  ('mage', 0, 1, 4)
-ON CONFLICT (name) DO NOTHING;
-
-INSERT INTO x_characters (name, level, job_id)
-SELECT 'Alice', 20, j.job_id FROM x_jobs j WHERE j.name = 'warrior'
-UNION ALL
-SELECT 'Bob', 18, j.job_id FROM x_jobs j WHERE j.name = 'mage'
-UNION ALL
-SELECT 'Celine', 12, j.job_id FROM x_jobs j WHERE j.name = 'warrior';
-
-INSERT INTO x_guilds (name, owner_id)
-SELECT 'Alpha', c.character_id
-FROM x_characters c
-WHERE c.name = 'Alice'
-ON CONFLICT (name) DO NOTHING;
-
-INSERT INTO x_guild_characters (guild_id, character_id)
-SELECT g.guild_id, c.character_id
-FROM x_guilds g
-JOIN x_characters c ON g.name = 'Alpha'
-WHERE c.name IN ('Alice', 'Bob')
-ON CONFLICT DO NOTHING;
+npm run sql from-teacher/10/insert-x_db_01.sql
   </code></pre>
 </div>
 
@@ -874,13 +840,12 @@ ON CONFLICT DO NOTHING;
   <div class="column-title">時刻特定の書き方</div>
   <p class="column-note">
     復旧時刻は、<code>SELECT now();</code> でメモした値を使います。手順書ではプレースホルダとして <code>XXXX-XX-XX XX:XX:XX</code> を使います。
-    例として「2026年2月23日 0時00分」を指定する場合は <code>recovery_target_time = '2026-02-23 00:00:00'</code> と書きます。
   </p>
 </div>
 
 <h2>8. SQLドリル</h2>
 
-<h3>ex-03_1：WHERE句漏れで論理削除フラグを全件更新</h3>
+<h3>ex-01.sql：WHERE句漏れで論理削除フラグを全件更新しないよう、復旧手順を設計してください。</h3>
 <p>
 特定キャラクタだけを論理削除する予定が、<code>WHERE</code> を書き忘れて全件に <code>deleted_at</code> を設定してしまう事故を再現します。
 </p>
@@ -892,8 +857,28 @@ UPDATE x_characters
 SET deleted_at = LOCALTIMESTAMP(0);
 COMMIT;
 </code></pre>
+<details>
+  <summary>解答例を見る</summary>
+  <pre><code class="language-bash">
+# 復旧時刻を「誤UPDATE直前」に設定
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker restart db-postgres
+  </code></pre>
+  <pre><code class="language-sql">
+-- 具体例: 2026/02/23 00:00:00 を使う場合
+-- recovery_target_time = '2026-02-23 00:00:00'
 
-<h3>ex-03_2：運営配布INSERTの二重実行</h3>
+-- 検証
+SELECT character_id, name, deleted_at
+FROM x_characters
+ORDER BY character_id;
+  </code></pre>
+  <p>
+  解説：誤更新の直前時刻を指定して復旧し、<code>deleted_at</code> が意図しない全件更新から戻っていることを確認してください。
+  </p>
+</details>
+
+<h3>ex-02.sql：運営配布INSERTの二重実行を復旧し、重複履歴を解消してください。</h3>
 <p>
 運営配布（システム→キャラクタ）を誤って2回実行し、<code>x_gold_transfers</code> に重複履歴を作るケースです。
 </p>
@@ -915,8 +900,26 @@ FROM x_characters
 WHERE deleted_at IS NULL;
 COMMIT;
 </code></pre>
+<details>
+  <summary>解答例を見る</summary>
+  <pre><code class="language-bash">
+# 2回目INSERT直前の時刻へ戻す
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker restart db-postgres
+  </code></pre>
+  <pre><code class="language-sql">
+-- 検証: 同一amountの重複が解消されているか確認
+SELECT to_character_id, amount, COUNT(*)
+FROM x_gold_transfers
+GROUP BY to_character_id, amount
+ORDER BY to_character_id, amount;
+  </code></pre>
+  <p>
+  解説：2回目実行前へ戻すことで配布履歴の重複をまとめて解消できます。集計で重複件数が解消されたことを確認してください。
+  </p>
+</details>
 
-<h3>ex-03_3：所属テーブルの物理削除</h3>
+<h3>ex-03.sql：所属テーブルの誤削除を復旧し、所属関係の整合性を確認してください。</h3>
 <p>
 特定キャラクタの所属だけ外すつもりが、誤った条件で削除してしまう事故を再現します。
 </p>
@@ -930,114 +933,8 @@ WHERE character_id IN (
 );
 COMMIT;
 </code></pre>
-
-<h3>ex-03_4：<code>x_guilds</code> テーブルの誤削除</h3>
-<p>
-作業用テーブルを削除するつもりで、誤って本表を削除するケースです。
-</p>
-<pre><code class="language-sql">
-SELECT now();
-
-DROP TABLE x_guilds;
-</code></pre>
-
-<h3>ex-03_5：レベル更新ロジックの誤適用</h3>
-<p>
-一部キャラクタだけの調整のつもりが、全員を上限レベルへ更新してしまうケースです。
-</p>
-<pre><code class="language-sql">
-SELECT now();
-
-BEGIN;
-UPDATE x_characters
-SET level = 255
-WHERE deleted_at IS NULL;
-COMMIT;
-</code></pre>
-
-<h3>ex-03_6：送金履歴の全削除</h3>
-<p>
-絞り込み削除のつもりが、履歴全体を消してしまうケースです。
-</p>
-<pre><code class="language-sql">
-SELECT now();
-
-BEGIN;
-DELETE FROM x_gold_transfers;
-COMMIT;
-</code></pre>
-
-<h2 id="answers">9. 演習の解答例</h2>
-<p>
-本章では、各ドリルに対して <span class="highlight">コマンド例</span> と <span class="highlight">SQL解答例</span> を必ず示します。
-時刻は <code>XXXX-XX-XX XX:XX:XX</code> をプレースホルダとして記述し、具体例として <code>2026-02-23 00:00:00</code> も併記します。
-</p>
-
 <details>
-<summary>共通リカバリ・テンプレート（コマンド + SQL）</summary>
-<pre><code class="language-bash">
-# 1) 復旧時刻を設定（プレースホルダ）
-docker exec -it db-postgres bash -c "echo \"restore_command = 'cp /backup/wal_archive/%f %p'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-docker exec -it db-postgres bash -c "echo \"recovery_target_timeline = 'latest'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-docker exec -it db-postgres bash -c "echo \"recovery_target_action = 'pause'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-
-# 2) 具体例（2026年2月23日 0時00分）
-docker exec -it db-postgres bash -c "echo \"recovery_target_time = '2026-02-23 00:00:00'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-
-# 3) recovery.signal の作成と再起動
-docker exec -it db-postgres bash -c "touch /var/lib/postgresql/data/recovery.signal"
-docker restart db-postgres
-  </code></pre>
-<pre><code class="language-sql">
--- 復旧確認SQL
-SELECT pg_is_in_recovery();
-SELECT pg_last_xact_replay_timestamp();
-
--- pause の場合のみ通常稼働へ移行
-SELECT pg_wal_replay_resume();
-  </code></pre>
-</details>
-
-<h3>ex-03_1 の解答例</h3>
-<details>
-  <summary>WHERE句漏れで deleted_at を全件更新した場合</summary>
-  <pre><code class="language-bash">
-# 復旧時刻を「誤UPDATE直前」に設定
-docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-docker restart db-postgres
-  </code></pre>
-  <pre><code class="language-sql">
--- 具体例: 2026/02/23 00:00:00 を使う場合
--- recovery_target_time = '2026-02-23 00:00:00'
-
--- 検証
-SELECT character_id, name, deleted_at
-FROM x_characters
-ORDER BY character_id;
-  </code></pre>
-</details>
-
-<h3>ex-03_2 の解答例</h3>
-<details>
-  <summary>運営配布INSERTを二重実行した場合</summary>
-  <pre><code class="language-bash">
-# 2回目INSERT直前の時刻へ戻す
-docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-docker restart db-postgres
-  </code></pre>
-  <pre><code class="language-sql">
--- 検証: 同一amountの重複が解消されているか確認
-SELECT to_character_id, amount, COUNT(*)
-FROM x_gold_transfers
-GROUP BY to_character_id, amount
-ORDER BY to_character_id, amount;
-  </code></pre>
-</details>
-
-<h3>ex-03_3 の解答例</h3>
-<details>
-  <summary>x_guild_characters を誤削除した場合</summary>
+  <summary>解答例を見る</summary>
   <pre><code class="language-bash">
 # DELETE直前の時刻へ戻す
 docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
@@ -1051,11 +948,22 @@ JOIN x_characters c ON c.character_id = gc.character_id
 WHERE c.name IN ('Alice', 'Bob')
 ORDER BY gc.guild_id, gc.character_id;
   </code></pre>
+  <p>
+  解説：中間テーブルの削除事故は参照整合性の崩れにつながります。復旧後は対象ユーザーの所属行が戻っていることを確認してください。
+  </p>
 </details>
 
-<h3>ex-03_4 の解答例</h3>
+<h3>ex-04.sql：<code>x_guilds</code> テーブル誤削除を復旧し、テーブル再生を確認してください。</h3>
+<p>
+作業用テーブルを削除するつもりで、誤って本表を削除するケースです。
+</p>
+<pre><code class="language-sql">
+SELECT now();
+
+DROP TABLE x_guilds;
+</code></pre>
 <details>
-  <summary>DROP TABLE x_guilds の復旧</summary>
+  <summary>解答例を見る</summary>
   <pre><code class="language-bash">
 # DROP実行直前へ戻す
 docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
@@ -1066,11 +974,26 @@ docker restart db-postgres
 \dt x_guilds
 SELECT COUNT(*) FROM x_guilds;
   </code></pre>
+  <p>
+  解説：物理削除はロールバックでは戻せないため、PITRで直前時点へ戻してください。テーブル存在確認と件数確認を両方実施してください。
+  </p>
 </details>
 
-<h3>ex-03_5 の解答例</h3>
+<h3>ex-05.sql：レベル更新ロジック誤適用を復旧し、分布の正常化を確認してください。</h3>
+<p>
+一部キャラクタだけの調整のつもりが、全員を上限レベルへ更新してしまうケースです。
+</p>
+<pre><code class="language-sql">
+SELECT now();
+
+BEGIN;
+UPDATE x_characters
+SET level = 255
+WHERE deleted_at IS NULL;
+COMMIT;
+</code></pre>
 <details>
-  <summary>level を全件255へ更新した場合</summary>
+  <summary>解答例を見る</summary>
   <pre><code class="language-bash">
 # UPDATE直前へ戻す
 docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
@@ -1083,11 +1006,24 @@ FROM x_characters
 GROUP BY level
 ORDER BY level;
   </code></pre>
+  <p>
+  解説：全件一律更新の事故では、分布確認が有効です。復旧後にレベル分布が単一値ではなく元の分布へ戻ることを確認してください。
+  </p>
 </details>
 
-<h3>ex-03_6 の解答例</h3>
+<h3>ex-06.sql：送金履歴の全削除を復旧し、履歴件数の回復を確認してください。</h3>
+<p>
+絞り込み削除のつもりが、履歴全体を消してしまうケースです。
+</p>
+<pre><code class="language-sql">
+SELECT now();
+
+BEGIN;
+DELETE FROM x_gold_transfers;
+COMMIT;
+</code></pre>
 <details>
-  <summary>x_gold_transfers を全削除した場合</summary>
+  <summary>解答例を見る</summary>
   <pre><code class="language-bash">
 # DELETE直前へ戻す
 docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
@@ -1098,6 +1034,9 @@ docker restart db-postgres
 SELECT COUNT(*) AS transfer_count
 FROM x_gold_transfers;
   </code></pre>
+  <p>
+  解説：履歴全削除は業務監査に直結するため、件数復旧を最初に確認してください。必要に応じて送金先別の集計でも再確認してください。
+  </p>
 </details>
 
 <hr>
