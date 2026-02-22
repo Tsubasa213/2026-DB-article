@@ -739,6 +739,8 @@ LIMIT 200;
   <p class="column-note">
     演習でテーブル状態が崩れた場合は、<code>from-teacher/10/create-x_db.sql</code> を実行して初期状態へ戻してください。
     例：<code>npm run sql from-teacher/10/create-x_db.sql</code>
+    <br>
+    ※もし <code>orders</code> や <code>customers</code> テーブルのデータ状態をおかしくしてしまい、初期化したい場合は、<strong>2.1章および2.2章のテーブル作成・データ投入SQLを再度実行</strong>してください。
   </p>
 </div>
 
@@ -752,7 +754,7 @@ LIMIT 200;
 </div>
 
 <h3>ドリル1：選択性を見抜く</h3>
-<p><strong>課題</strong>：status='paid' と status='canceled' の計画差を比較し、理由を説明します。</p>
+<p><strong>課題</strong>：status='paid' と status='canceled' の計画差を比較し、理由を説明してください。</p>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -792,7 +794,7 @@ SELECT * FROM orders WHERE status = 'canceled';
 </details>
 
 <h3>ドリル2：複合インデックスの列順</h3>
-<p><strong>課題</strong>：2本の複合インデックスの効き方を比較します。</p>
+<p><strong>課題</strong>：2本の複合インデックスの効き方を比較してください。</p>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -836,7 +838,7 @@ WHERE status = 'paid'
 </details>
 
 <h3>ドリル3：統計誤差の修正</h3>
-<p><strong>課題</strong>：偏った更新後に rows 推定が外れたケースを、ANALYZEで改善します。</p>
+<p><strong>課題</strong>：偏った更新後に rows 推定が外れたケースを、ANALYZEで改善してください。</p>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -878,7 +880,7 @@ SELECT * FROM orders WHERE shipping_pref = 'tokyo';
 </details>
 
 <h3>ドリル4：JOINの計画比較</h3>
-<p><strong>課題</strong>：JOIN条件を変えて Hash Join / Nested Loop の切り替わりを観察します。</p>
+<p><strong>課題</strong>：JOIN条件を変えて Hash Join / Nested Loop の切り替わりを観察してください。</p>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -931,7 +933,7 @@ GROUP BY c.segment;
 </details>
 
 <h3>ドリル5：ORDER BYとインデックス</h3>
-<p><strong>課題</strong>：並び替えに対するインデックス効果を確認します。</p>
+<p><strong>課題</strong>：並び替えに対するインデックス効果を確認してください。</p>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)
@@ -978,7 +980,7 @@ LIMIT 100;
 </details>
 
 <h3>ドリル6：失敗体験（統計が古く最悪計画になる）</h3>
-<p><strong>課題</strong>：統計情報を意図的に古くし、改善前後の計画差を比較します。</p>
+<p><strong>課題</strong>：統計情報を意図的に古くし、改善前後の計画差を比較してください。</p>
 <pre><code class="language-sql">
 -- ステップ1: 現状確認
 EXPLAIN (ANALYZE, BUFFERS)

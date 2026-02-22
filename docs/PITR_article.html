@@ -83,7 +83,7 @@ pg_dump -d mydb -F c -f backup.dump
 </ul>
 
 <details>
-  <summary>：論理バックアップと物理バックアップをどう使い分けますか？</summary>
+  <summary>演習：論理バックアップと物理バックアップをどう使い分けますか？</summary>
   <p>
     「テーブル単位で戻したいケース」と「障害直後に全体を早く戻したいケース」をそれぞれ想定し、
     どちらの方式を選ぶか理由つきで説明してみてください。
@@ -554,8 +554,9 @@ npm run db:up
 docker ps
 </code></pre>
 <pre><code class="language-bash">
-mkdir -p /backup/base
-mkdir -p /backup/wal_archive
+# コンテナ内にバックアップ用ディレクトリを作成
+docker exec -it db-postgres bash -c "mkdir -p /backup/base"
+docker exec -it db-postgres bash -c "mkdir -p /backup/wal_archive"
 </code></pre>
 
 <h3>5.5 WALアーカイブ設定の確認</h3>
@@ -585,7 +586,7 @@ docker restart db-postgres
 </p>
 <p>
 SQLの実行は、講義資料どおりに <span class="highlight">VSCodeのタスク実行</span> または
-<span class="highlight">ターミナルからnpm run sql</span> を使う。以下はターミナル実行の例。
+<span class="highlight">ターミナルからnpm run sql</span> を使います。以下はターミナル実行の例です。
 </p>
 <pre><code class="language-bash">
 # 例: 一時ファイルを作ってSQLを実行
@@ -678,7 +679,7 @@ SELECT now();
 SELECT * FROM pitr_demo ORDER BY id;
 </code></pre>
 
-<p>誤操作として削除を実行。</p>
+<p>誤操作として削除を実行します。</p>
 <pre><code class="language-sql">
 DROP TABLE pitr_demo;
 </code></pre>
