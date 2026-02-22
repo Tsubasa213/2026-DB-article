@@ -49,8 +49,8 @@ PITRの前に、基本のバックアップ/リストアを整理します。こ
 
 <h4>用語の意味</h4>
 <p>
-<span class="highlight">バックアップ</span>はデータを安全な場所に複製して保存すること。
-<span class="highlight">リストア</span>はバックアップからデータを戻し、元の状態に復元すること。
+<span class="highlight">バックアップ</span>は、データを安全な場所に複製して保存することです。
+<span class="highlight">リストア</span>は、バックアップからデータを戻し、元の状態に復元することです。
 </p>
 
 <h4>バックアップの種類</h4>
@@ -60,7 +60,7 @@ PITRはベースバックアップとWAL（Write-Ahead Logging）の組み合わ
 そのため、論理だけでなく物理バックアップの特徴も把握しておく必要があります。
 </p>
 <ul>
-  <li><span class="highlight">論理バックアップ</span>：SQLとして取り出す。<code>pg_dump</code> を使う。<strong>可搬性が高い</strong>が、復元に時間がかかる。</li>
+  <li><span class="highlight">論理バックアップ</span>：SQLとして取り出します。<code>pg_dump</code> を使います。<strong>可搬性が高い</strong>一方で、復元に時間がかかります。</li>
   <li><span class="highlight">物理バックアップ</span>：DBファイルを丸ごと複製します。<code>pg_basebackup</code> を使います。<strong>復旧が速い</strong>ですが、同一バージョン前提です。</li>
 </ul>
 
@@ -187,8 +187,8 @@ psql -d mydb -f backup.sql
 <div class="column">
   <div class="column-title">復習の要点</div>
   <p class="column-note">
-  バックアップは取得よりも<strong>復元が成功するか</strong>が重要。
-  PITRは復元を時点指定で行う技術と位置付ける。
+  バックアップは取得よりも<strong>復元が成功するか</strong>が重要です。
+  PITRは、復元を時点指定で行う技術として位置付けます。
   </p>
 </div>
 
@@ -218,7 +218,7 @@ psql -d mydb -f backup.sql
 <h3>定着確認（第2章）</h3>
 <ul>
   <li>論理バックアップだけで時点指定復旧は<span class="masked">できない</span>。</li>
-  <li>PITRには<span class="masked">物理バックアップ + WAL</span>の組み合わせが必要である。</li>
+  <li>PITRには<span class="masked">物理バックアップ + WAL</span>の組み合わせが必要です。</li>
   <li>復元後は件数確認などの<span class="masked">整合性チェック</span>を必ず行う。</li>
 </ul>
 
@@ -314,8 +314,9 @@ PITRは時刻以外にも停止位置を指定できます。
 
 <h3>3.4.1 タイムラインの考え方</h3>
 <p>
-PITRで復旧を行うと、<span class="highlight">履歴が分岐</span>してタイムラインが変わる。
-タイムライン1から復旧すると、新しいタイムライン2が始まる。
+PostgreSQLにおけるタイムラインは、<span class="highlight">WAL再生の履歴系統</span>を識別・管理するための概念です。
+通常運用時は1本の履歴を進みますが、PITRで過去時点に復旧して再開すると、新しい履歴系統が作られます。
+その結果、元の履歴から<span class="highlight">分岐した新しいタイムライン</span>が始まります。
 </p>
 <pre><code class="language-text">
 Timeline 1: ----A----B----C----(誤操作)
@@ -323,14 +324,14 @@ Timeline 1: ----A----B----C----(誤操作)
 Timeline 2:               ----D----E----(復旧後の新しい履歴)
 </code></pre>
 <p>
-復旧設定に <span class="highlight"><code>recovery_target_timeline = 'latest'</code></span> を明示して最新タイムラインを追従させる。
+復旧設定に <span class="highlight"><code>recovery_target_timeline = 'latest'</code></span> を明示すると、最新タイムラインを追従できます。
 </p>
 
 <div class="column">
   <div class="column-title">補足：<code>recovery_target_action</code> の役割</div>
   <p class="column-note">
   <code>recovery_target_action</code> は「目標時刻に到達した後の動作」を決める。
-  デフォルトは <span class="highlight">pause</span> で、読み取りはできても書き込みができない状態になる。
+  デフォルトは <span class="highlight">pause</span> で、読み取りはできても書き込みができない状態になります。
   書き込みを再開したい場合は <span class="highlight">promote</span> を指定するか、
   復旧後に <span class="highlight">SELECT pg_wal_replay_resume();</span> を実行して通常稼働へ移行します。
   </p>
@@ -363,18 +364,18 @@ Timeline 2:               ----D----E----(復旧後の新しい履歴)
 
 <h3>3.6 運用での考え方</h3>
 <p>
-PITRは運用設計とセットで扱う。<span class="highlight-strong">RPO</span>は失ってよい最大時間、<span class="highlight-strong">RTO</span>は復旧に許される時間。これらを意識すると、
-どの頻度でバックアップし、どれだけWALを保存すべきか判断できる。
+PITRは運用設計とセットで扱います。<span class="highlight-strong">RPO</span>は失ってよい最大時間、<span class="highlight-strong">RTO</span>は復旧に許される時間です。これらを意識すると、
+どの頻度でバックアップし、どれだけWALを保存すべきかを判断できます。
 </p>
 <ul>
-  <li>RPOが短いほどWAL欠落が許されない</li>
-  <li>RTOが短いほど復旧手順の自動化が必要</li>
+  <li>RPOが短いほどWAL欠落を許容できません。</li>
+  <li>RTOが短いほど復旧手順の自動化が必要です。</li>
 </ul>
 <h3>3.7 事例で見るPITR</h3>
 <p>
 午前中の運用作業で、担当者が間違えて重要テーブルを削除してしまったとします。監視にはエラーが上がり、
-ユーザから「データが消えた」と連絡が入った。ここで求められるのは、<span class="highlight">直前の時点に戻す</span>こと。
-PITRはこの状況で最短復旧を実現するための選択肢になる。
+ユーザから「データが消えた」と連絡が入りました。ここで求められるのは、<span class="highlight">直前の時点に戻す</span>ことです。
+PITRはこの状況で最短復旧を実現するための有力な選択肢になります。
 </p>
 <ol>
   <li>「いつ消えたか」を時刻で確定する</li>
@@ -435,8 +436,8 @@ PITRは「まず起点を用意し、次に更新履歴を順に再生し、最�
 <h3>定着確認（第3章）</h3>
 <ul>
   <li>WALは基本的に<span class="masked">REDOログ</span>として機能する。</li>
-  <li>WALだけでは復旧できず、<span class="masked">ベースバックアップ</span>が起点として必要である。</li>
-  <li>時点指定復旧で厳密な位置を指定する場合は<span class="masked">LSN</span>が有効である。</li>
+  <li>WALだけでは復旧できず、<span class="masked">ベースバックアップ</span>が起点として必要です。</li>
+  <li>時点指定復旧で厳密な位置を指定する場合は<span class="masked">LSN</span>が有効です。</li>
 </ul>
 
 <h3>3.10 時刻特定の手法・自動ログと手動記録</h3>
@@ -457,48 +458,72 @@ PITRで最も難しいのは「何時何分何秒に戻すべきか」を特定�
 </div>
 <h2>4. ハンズオン学習</h2>
 <p>
-この章では「誤操作の直前時刻に戻せること」をゴールに、PITRの設定・復旧・確認までを一連で実施します。
-ここを先に読んでから手順を進めると、何を触っているかを見失いにくくなります。
+この章では、誤操作の直前時刻に戻せることを目標に、PITRの設定から復旧確認までを実施します。
 </p>
 
 <div class="column">
   <div class="column-title">この章の目的</div>
+
   <ul class="column-note">
-    <li>WALアーカイブ設定を有効化し、復旧可能な状態を作る。</li>
-    <li>誤操作（例: <code>DROP TABLE</code>）を再現し、<code>recovery_target_time</code> で巻き戻す。</li>
-    <li>復旧後に <code>pg_is_in_recovery()</code> などで状態確認し、通常稼働へ戻す。</li>
+    <li><strong>リカバリ準備</strong>：WALアーカイブ設定を有効化し、常に復旧可能な状態を構築します。</li>
+    <li><strong>障害再現と復旧</strong>：誤操作（例: <code>DROP TABLE</code>）をあえて実行し、ターゲット時刻を指定して巻き戻します。</li>
+    <li><strong>通常稼働への復帰</strong>：リカバリ状態を確認し、書き込み可能な通常状態へプロモートします。</li>
   </ul>
 </div>
 
+
+<h3>4.1 ホストとコンテナの境界を理解する</h3>
+<p>
+  ハンズオンを進めるにあたり、「自分のPC（ホスト環境）」と「Dockerコンテナ内部」の違いを正確に把握することが非常に重要です。
+</p>
 <div class="column">
-  <div class="column-title">今から触るファイル</div>
-  <ul class="column-note">
-    <li><code>/var/lib/postgresql/data/postgresql.auto.conf</code>（復旧パラメータの追記先）</li>
-    <li><code>sql/tmp_pitr.sql</code>（手元で実行するSQLの一時ファイル）</li>
-    <li><code>from-teacher/10/create-x_db.sql</code>（演習環境を初期化する再構築用SQL）</li>
-  </ul>
+  <div class="column-title">コンテナ内の操作について</div>
+  <p class="column-note">
+    コンテナとは、Dockerによって構築された<strong>「完全に隔離された独立したデータベースサーバー」</strong>です。
+    そのため、コンテナ内部のファイル（設定ファイルなど）は、普段使っているVS Codeのエクスプローラー（ファイルツリー）からは直接見えませんし、クリックして編集することもできません。
+    本演習では、ホスト側のターミナルから <code>docker exec</code> コマンドを使用して、コンテナ内部へ直接指示（コマンド）を送り込むことでファイルを操作します。
+  </p>
 </div>
 
-<div class="column">
-  <div class="column-title">使用するテーブル</div>
-  <ul class="column-note">
-    <li><code>pitr_demo</code>（4章で作成するPITR確認用テーブル）</li>
-    <li><code>x_characters</code> / <code>x_gold_transfers</code> / <code>x_guild_characters</code> / <code>x_guilds</code>（6章のSQLドリルで利用）</li>
-    <li>状態が崩れた場合は <code>from-teacher/10/create-x_db.sql</code> で再構築する。</li>
-  </ul>
-</div>
+<p>
+  以下の階層図を見て、作業場所が「ホスト側」か「コンテナ内部」かを混同しないよう注意してください。
+</p>
 
-<div class="column">
-  <div class="column-title">実行の流れ（最短）</div>
-  <ol class="column-note">
-    <li>作業ディレクトリを <code>DB-PostgreSQL</code> に合わせ、<code>npm run db:up</code> で起動確認。</li>
-    <li><code>postgresql.auto.conf</code> に <code>restore_command</code> などを設定し再起動。</li>
-    <li>SQLは <code>npm run sql sql/tmp_pitr.sql</code> で実行し、時刻を記録して復旧ターゲットに使う。</li>
-    <li>復旧後は検証クエリで整合性確認し、必要に応じて通常稼働へ移行する。</li>
-  </ol>
-</div>
+<pre><code class="language-text">
+DB-PostgreSQL/ (ホスト側の作業ルート：VS Codeで直接編集可能)
+└── sql/
+    └── tmp_pitr.sql            # 今回のハンズオンで実行するSQLを記述するファイル（新規作成）
 
-<h3>4.1 作業用ディレクトリの準備</h3>
+[Dockerコンテナ内部: /var/lib/postgresql/data/] (隔離領域：dockerコマンド経由で操作)
+├── postgresql.auto.conf    # 復旧コマンドや目標時刻を動的に設定するファイル（追記編集）
+└── recovery.signal         # 存在するとDBが「リカバリモード」で起動するフラグファイル（新規作成）
+</code></pre>
+
+<p>まずはホスト側で、後ほど使用するSQL実行用の空ファイルを作成しておきます。</p>
+<pre><code class="language-bash">
+# ホスト側のターミナル（VS Codeのターミナル等）で実行
+touch sql/tmp_pitr.sql
+</code></pre>
+<p>
+  ※ コンテナ内部のファイル（<code>postgresql.auto.conf</code> や <code>recovery.signal</code>）に対する作成・編集については、この後のリカバリ手順の中で <code>docker exec</code> コマンドを用いて実行します。
+</p>
+
+<h3>4.2 演習で使用するテーブル</h3>
+<p>
+  本章のハンズオンでは、PITRが正常に機能するかを確認するため、専用の練習用テーブルを使用します。
+</p>
+<ul>
+  <li><strong>pitr_demo</strong>：導入ハンズオン用。データの挿入と削除を行い、指定した時刻へ正確に戻れるかをテストします。</li>
+</ul>
+
+<h3>4.3 実行の全体フロー</h3>
+<ol>
+  <li><strong>設定と再起動</strong>：コンテナ内の <code>postgresql.auto.conf</code> にリカバリ設定を書き込み、コンテナを再起動します。</li>
+  <li><strong>演習実行と記録</strong>：作成した <code>sql/tmp_pitr.sql</code> を <code>npm run sql sql/tmp_pitr.sql</code> で実行し、「誤操作が起きた時刻」を正確にメモします。</li>
+  <li><strong>通常稼働への復帰</strong>：データが復旧したことを確認した後、<code>SELECT pg_wal_replay_resume();</code> を実行して書き込み可能な状態へ移行します。</li>
+</ol>
+
+<h3>4.4 作業用ディレクトリの準備</h3>
 <p>バックアップ先とアーカイブ先を明示的に作成します。</p>
 <p>
 このハンズオンは、講義資料どおりに構築済みの <span class="highlight">DB-PostgreSQL</span> フォルダを前提とします。
@@ -532,7 +557,7 @@ mkdir -p /backup/base
 mkdir -p /backup/wal_archive
 </code></pre>
 
-<h3>4.2 WALアーカイブ設定の確認</h3>
+<h3>4.5 WALアーカイブ設定の確認</h3>
 <p>
 まずは現在の設定を確認します。設定ファイルを直接編集する場合は、操作権限と再起動が必要になるため注意してください。
 </p>
@@ -582,7 +607,7 @@ wal_level = replica
   <div class="column-title">補足：archive_command が失敗する代表例</div>
   <p class="column-note">
   パスの存在・権限不足・同名ファイルの衝突が多い。`test ! -f` で上書きを防ぎつつ、
-  実際にアーカイブ先にファイルが作成されているか確認すること。
+  実際にアーカイブ先にファイルが作成されているかを確認してください。
   </p>
 </div>
 
@@ -594,13 +619,20 @@ wal_level = replica
   </p>
 </div>
 <div class="column">
+  <div class="column-title">失敗時の観察ポイント（4.2で実施）</div>
+  <p class="column-note">
+    ここではあえて <code>restore_command</code> のパスを誤設定し、起動後にログを確認する練習をしておくと、
+    実際の障害時に切り分けが速くなります。確認後は必ず正しいパスへ戻してください。
+  </p>
+</div>
+<div class="column">
   <div class="column-title">参考質問例</div>
   <p class="column-note">
   「`archive_command` が失敗したときの切り分け手順を、①パス ②権限 ③既存ファイル衝突 ④ログ確認 の順で具体的に示してください。」
   </p>
 </div>
 
-<h3>4.3 ベースバックアップの取得</h3>
+<h3>4.6 ベースバックアップの取得</h3>
 <p>ベースバックアップは復旧の起点です。まず取得してください。</p>
 <pre><code class="language-bash">
 pg_basebackup -D /backup/base -Fp -Xs -P
@@ -609,8 +641,8 @@ pg_basebackup -D /backup/base -Fp -Xs -P
 <strong>-D</strong> は出力先、<strong>-Fp</strong> はプレーン形式、<strong>-Xs</strong> はWALのストリーミング取得、<strong>-P</strong> は進捗表示。
 </p>
 
-<h3>4.4 WAL生成とアーカイブ確認</h3>
-<h4>4.4.1 テスト用テーブル作成</h4>
+<h3>4.7 WAL生成とアーカイブ確認</h3>
+<h4>4.7.1 テスト用テーブル作成</h4>
 <pre><code class="language-sql">
 CREATE TABLE pitr_demo (
   id SERIAL PRIMARY KEY,
@@ -619,7 +651,7 @@ CREATE TABLE pitr_demo (
 );
 </code></pre>
 
-<h4>4.4.2 変更を発生させる</h4>
+<h4>4.7.2 変更を発生させる</h4>
 <pre><code class="language-sql">
 INSERT INTO pitr_demo (message) VALUES
   ('first'),
@@ -627,17 +659,17 @@ INSERT INTO pitr_demo (message) VALUES
   ('third');
 </code></pre>
 
-<h4>4.4.3 WALアーカイブの生成を促す</h4>
+<h4>4.7.3 WALアーカイブの生成を促す</h4>
 <pre><code class="language-sql">
 SELECT pg_switch_wal();
 </code></pre>
 
-<h4>4.4.4 アーカイブ確認</h4>
+<h4>4.7.4 アーカイブ確認</h4>
 <pre><code class="language-bash">
 ls -la /backup/wal_archive
 </code></pre>
 
-<h3>4.5 障害発生の再現</h3>
+<h3>4.8 障害発生の再現</h3>
 <p>削除直前の時刻を記録してください。復旧ターゲットとして使用します。</p>
 <pre><code class="language-sql">
 SELECT now();
@@ -649,8 +681,8 @@ SELECT * FROM pitr_demo ORDER BY id;
 DROP TABLE pitr_demo;
 </code></pre>
 
-<h3>4.6 PITRによる復旧</h3>
-<h4>4.6.1 目標時刻の設定</h4>
+<h3>4.9 PITRによる復旧</h3>
+<h4>4.9.1 目標時刻の設定</h4>
 <p>削除直前の時刻をメモして、その時刻へ復旧してください。</p>
 <pre><code class="language-ini">
 recovery_target_time = '2026-01-27 10:30:00'
@@ -659,19 +691,29 @@ recovery_target_action = 'promote'
 </code></pre>
 <p>
 <span class="highlight"><code>recovery_target_action = 'promote'</code></span> を指定しない場合は <code>pause</code> になるので、
-復旧後に書き込みができない状態になる。pauseのままにする場合は、
-復旧後に <span class="highlight">SELECT pg_wal_replay_resume();</span> を実行して通常稼働へ移行します。
+復旧後に書き込みができない状態になります。<code>pause</code> のままにする場合は、
+復旧後に次のSQLを実行して通常稼働へ移行します。
 </p>
+<pre><code class="language-sql">
+SELECT pg_wal_replay_resume();
+</code></pre>
 
-<h4>4.6.2 リストア用の基本設定</h4>
+<h4>4.9.2 リストア用の基本設定</h4>
 <pre><code class="language-ini">
 restore_command = 'cp /backup/wal_archive/%f %p'
 </code></pre>
 <p>
-ここでパスを間違えると、<span class="highlight">無言で復旧が進まない</span>ことがあります。ログ確認を必ずセットで実施してください。
+ここでパスを間違えると、<span class="highlight">エラーメッセージが表示されないまま処理が停滞する</span>ことがあります。ログ確認を必ずセットで実施してください。
 </p>
+<div class="column">
+  <div class="column-title">原因理解</div>
+  <p class="column-note">
+    学習時は、あえて誤ったパスで一度起動し、<code>docker logs db-postgres</code> で症状を確認してから正しい設定に戻すと、
+    復旧停滞時の見え方を具体的に理解できます。
+  </p>
+</div>
 
-<h4>4.6.3 復旧シグナルの用意</h4>
+<h4>4.9.3 復旧シグナルの用意</h4>
 <pre><code class="language-bash">
 touch recovery.signal
 </code></pre>
@@ -680,9 +722,13 @@ Docker環境では <span class="highlight">/var/lib/postgresql/data</span> に�
 <span class="highlight">docker exec -it db-postgres bash -c "touch /var/lib/postgresql/data/recovery.signal"</span>
 </p>
 <p>
-このコマンドは <span class="highlight">コンテナが起動している状態</span>で実行する必要がある。
-実行直後に <span class="highlight">docker restart db-postgres</span> を行う流れにすると迷いにくい。
+このコマンドは <span class="highlight">コンテナが起動している状態</span>で実行する必要があります。
+実行直後に <span class="highlight">docker restart db-postgres</span> を行う流れにすると迷いにくいです。
 </p>
+<pre><code class="language-sql">
+-- 復旧後に pause 状態の場合のみ実行
+SELECT pg_wal_replay_resume();
+</code></pre>
 <div class="column">
   <div class="column-title">順序の確認 重要</div>
   <p class="column-note">
@@ -693,12 +739,12 @@ Docker環境では <span class="highlight">/var/lib/postgresql/data</span> に�
   </p>
 </div>
 
-<h4>4.6.4 復旧後の確認</h4>
+<h4>4.9.4 復旧後の確認</h4>
 <pre><code class="language-sql">
 SELECT * FROM pitr_demo ORDER BY id;
 </code></pre>
 
-<h4>4.6.5 復旧状況の監視コマンド</h4>
+<h4>4.9.5 復旧状況の監視コマンド</h4>
 <pre><code class="language-sql">
 -- 復旧中かどうか
 SELECT pg_is_in_recovery();
@@ -728,18 +774,7 @@ SELECT pg_last_xact_replay_timestamp();
   <li>復旧後にアプリが動かない場合は<span class="highlight">接続先が旧DBのまま</span>でないか確認する。</li>
 </ul>
 
-<h3>5.1 失敗体験</h3>
-<p>
-「意図的な失敗」を組み込み、トラブルシューティングの手順を確認します。
-</p>
-<ol>
-  <li><code>restore_command</code> のパスをわざと間違える</li>
-  <li>起動後に <span class="highlight">復旧が進まない</span>ことを確認</li>
-  <li><span class="highlight">docker logs db-postgres</span> でエラーを確認</li>
-  <li>正しいパスに戻して復旧を再実行</li>
-</ol>
-
-<h3>5.2 WALの掃除</h3>
+<h3>5.1 WALの掃除</h3>
 <p>
 WALアーカイブを溜め続けるとディスクが溢れます。古いWALを削除する場合は
 <code>pg_archivecleanup</code> の利用を検討してください。
@@ -764,190 +799,300 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
   <li>復旧後に不整合がある場合は <span class="masked">接続先誤りやWAL欠落</span> を疑う。</li>
 </ul>
 
-<h2>6. SQLドリル / 演習</h2>
+<h2>6. SQLドリル / 演習の準備</h2>
 <p>
-本演習では、第10回講義などで構築した <code>x_characters</code> や <code>x_gold_transfers</code> テーブルを使用します。
-単にクエリを書くだけでなく、あえて誤ったコードを確定（COMMIT）させ、その後にPITRを用いて正常な状態へ戻すプロセスを体験します。
+本演習は、<code>test-sql/create-x_db.sql</code> で定義される実スキーマ（<code>x_jobs</code> / <code>x_characters</code> / <code>x_guilds</code> / <code>x_guild_characters</code> / <code>x_items</code> / <code>x_character_items</code> / <code>x_gold_transfers</code>）を前提に進めます。
+本章では、誤操作を意図的に発生させ、PITRで戻す手順を確認します。
 </p>
+
+<div class="column">
+  <div class="column-title">ER図（create-x_db.sql対応）</div>
+  <p class="column-note">
+    以下は <code>test-sql/create-x_db.sql</code> に対応するER図です。ドリル前にテーブル関連を確認してください。
+  </p>
+  <img src="../images/LER-01.png" alt="create-x_db.sql のER図" />
+</div>
 
 <div class="column">
   <div class="column-title">解答例の場所</div>
   <p class="column-note">
-    各演習の解答は <a href="#answers">第7章「演習の解答例」</a> にまとめています。演習を実施した後に第7章へ移動して確認してください。
+    各演習の解答は <a href="#answers">第8章「演習の解答例」</a> にまとめています。
+    第8章には、各問題について <span class="highlight">コマンド例</span> と <span class="highlight">SQL解答例</span> の両方を掲載しています。
   </p>
 </div>
 
 <div class="column">
   <div class="column-title">演習環境の再構築</div>
   <p class="column-note">
-    演習の結果、テーブル構造や初期データが不明になった場合は、
-    <code>from-teacher/10/create-x_db.sql</code> を実行して環境を初期状態にリセットしてください。
-    このスクリプトにより、キャラクター情報やギルド所属情報が正しく再生成されます。
-  </p>
-</div>
-
-<div class="column">
-  <div class="column-title">時刻特定とログの仕組み</div>
-  <p class="column-note">
-    PITRで最も重要な「復旧時刻」の特定には、主に2つの方法があります。
-    一つはデータベースの実行ログ（postgresql.log）を確認する方法で、設定により実行されたSQLと時刻が自動記録されます。
-    もう一つは、<code>x_gold_transfers</code> の <code>transferred_at</code> カラムのように、データ自体に自動付与されるタイムスタンプを参照する方法です。
-    本演習では <code>SELECT now();</code> を用いて手動で時刻をメモしますが、実務ではこれらの自動ログが頼りになります。
-  </p>
-</div>
-
-<h3>ex-03_1：条件指定漏れによる全キャラクターの所持金更新</h3>
-<p>
-特定のキャラクターのゴールドを調整するつもりが、WHERE句を書き忘れたために、全キャラクターのゴールドを0に更新して確定させてしまったケースを再現します。
-</p>
-<div class="column">
-  <div class="column-title">ステップ1：誤操作の実行</div>
-  <p class="column-note">まず現在時刻をメモし、以下のコードを実行・確定してください。</p>
-<pre><code class="language-sql">
--- 現在時刻をメモ
-SELECT now();
-
-BEGIN;
-UPDATE x_characters SET gold = 0; 
-COMMIT;
-</code></pre>
-</div>
-<div class="column">
-  <div class="column-title">ステップ2：リカバリ課題</div>
-  <p class="column-note">
-    メモした時刻をターゲットにPITRを行い、キャラクターのゴールドが初期値（例：Marvinは50,000G）に戻っているか確認してください。
-  </p>
-</div>
-
-<hr>
-
-<h3>ex-03_2：報酬配布スクリプトの二重実行</h3>
-<p>
-配布スクリプトを誤って2回連続で実行したために、送金履歴テーブルに重複したレコードが記録されてしまったケースを再現します。
-</p>
-<div class="column">
-  <div class="column-title">ステップ1：重複データの発生</div>
-  <p class="column-note">以下の配布処理を<strong>2回</strong>実行し、COMMITしてください。1回目と2回目の間の時刻を特定する必要があります。</p>
-<pre><code class="language-sql">
-BEGIN;
-INSERT INTO x_gold_transfers (from_character_id, to_character_id, amount, transferred_at)
-SELECT '_SYS_', id, 10000, now() FROM x_characters WHERE deleted_at IS NULL;
-COMMIT;
-</code></pre>
-</div>
-<div class="column">
-  <div class="column-title">ステップ2：リカバリ課題</div>
-  <p class="column-note">
-    1回目の実行は正当な配布とし、2回目の実行が行われる直前の時刻まで巻き戻して、重複を解消してください。
-  </p>
-</div>
-
-<hr>
-
-<h3>ex-03_3：物理削除事故</h3>
-<p>
-本来は論理削除（deleted_atの更新）をすべきところを、誤って物理削除（DELETE）を実行し、ギルド所属情報を消去してしまったケースを再現します。
-</p>
-<div class="column">
-  <div class="column-title">ステップ1：物理削除の実行</div>
-<pre><code class="language-sql">
--- 実行前の時刻をメモ
-SELECT now();
-
-BEGIN;
-DELETE FROM x_guild_characters WHERE character_id = 'C001'; 
-COMMIT;
-</code></pre>
-</div>
-<div class="column">
-  <div class="column-title">ステップ2：リカバリ課題</div>
-  <p class="column-note">
-    物理削除されたレコードはROLLBACKでは戻せません。PITRを行い、対象の所属レコードを復活させてください。
-  </p>
-</div>
-
-<hr>
-
-<h3>ex-03_4：本番テーブルの誤削除</h3>
-<p>
-作業用テーブルを削除するつもりが、誤って <code>x_guilds</code> テーブルそのものを削除してしまったケースを想定します。
-</p>
-<div class="column">
-  <div class="column-title">リカバリ課題</div>
-  <p class="column-note">
-    <code>DROP TABLE x_guilds;</code> を実行した後、PITRによってテーブル構造とデータの両方を復旧させてください。
-  </p>
-</div>
-
-<hr>
-
-<h3>ex-03_5：一斉昇級処理のロジックエラー</h3>
-<p>
-全キャラクターのゴールドを1.1倍（10%増）にするつもりが、誤って <code>gold * 10</code> （10倍）にして確定してしまったケースを再現します。
-</p>
-<div class="column">
-  <div class="column-title">ステップ1：誤った一斉更新</div>
-<pre><code class="language-sql">
-BEGIN;
-UPDATE x_characters SET gold = gold * 10;
-COMMIT;
-</code></pre>
-</div>
-<div class="column">
-  <div class="column-title">ステップ2：リカバリ課題</div>
-  <p class="column-note">
-    経済バランスが壊れた状態から、実行数秒前の時刻を指定して元のゴールド量へ巻き戻してください。
-  </p>
-</div>
-
-<hr>
-
-<h3>ex-03_6：ギルド解散処理の誤適用</h3>
-<p>
-特定のギルドのメンバーを脱退させるつもりが、条件指定のミスで全ギルドの所属情報を削除してしまったケースを想定します。
-</p>
-<div class="column">
-  <div class="column-title">リカバリ課題</div>
-  <p class="column-note">
-    <code>DELETE FROM x_guild_characters;</code> を実行・確定した後、削除直前の時刻を特定し、全メンバーの所属状況を復元してください。
-  </p>
-</div>
-
-<h2 id="answers">7. 演習の解答例</h2>
-<p>各演習に共通する標準的なリカバリ手順の考え方です。時刻やパスは各自の環境に合わせて調整してください。</p>
-
-<details>
-<summary>共通リカバリ・テンプレート</summary>
-<div class="column">
-  <div class="column-title">リカバリ用パラメータ設定</div>
-  <p class="column-note">
-    postgresql.auto.conf への反映例です。時刻やパスは各自の環境に合わせて書き換えてください。
+    演習結果で状態が不明になった場合は、次のコマンドでスキーマを再作成してください。
   </p>
   <pre><code class="language-bash">
-# パラメータの記述例
-docker exec -it db-postgres bash -c "echo \"restore_command = 'cp /backup/wal_archive/%f %p'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-docker exec -it db-postgres bash -c "echo \"recovery_target_time = '2026-02-16 10:00:00'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-docker exec -it db-postgres bash -c "echo \"recovery_target_timeline = 'latest'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
-docker exec -it db-postgres bash -c "echo \"recovery_target_action = 'promote'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+npm run sql test-sql/create-x_db.sql
   </code></pre>
 </div>
 
 <div class="column">
-  <div class="column-title">復旧後の確認と再開用SQL</div>
+  <div class="column-title">最小データの投入（ドリル実行前）</div>
   <p class="column-note">
-    リカバリ完了後、データベースの状態を確認し、必要に応じて通常稼働へ移行させます。
+    <code>create-x_db.sql</code> はテーブル定義が中心です。以下の最小データを入れてからドリルを実施してください。
   </p>
   <pre><code class="language-sql">
--- リカバリ状態の確認（'t' であればリカバリモード中）
-SELECT pg_is_in_recovery();
+INSERT INTO x_jobs (name, attack_gain, defense_gain, magic_gain)
+VALUES
+  ('warrior', 3, 2, 0),
+  ('mage', 0, 1, 4)
+ON CONFLICT (name) DO NOTHING;
 
--- 最後に再生されたトランザクション時刻の確認
-SELECT pg_last_xact_replay_timestamp();
+INSERT INTO x_characters (name, level, job_id)
+SELECT 'Alice', 20, j.job_id FROM x_jobs j WHERE j.name = 'warrior'
+UNION ALL
+SELECT 'Bob', 18, j.job_id FROM x_jobs j WHERE j.name = 'mage'
+UNION ALL
+SELECT 'Celine', 12, j.job_id FROM x_jobs j WHERE j.name = 'warrior';
 
--- 通常稼働へ移行（書き込みを許可する）
-SELECT pg_wal_replay_resume();
+INSERT INTO x_guilds (name, owner_id)
+SELECT 'Alpha', c.character_id
+FROM x_characters c
+WHERE c.name = 'Alice'
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO x_guild_characters (guild_id, character_id)
+SELECT g.guild_id, c.character_id
+FROM x_guilds g
+JOIN x_characters c ON g.name = 'Alpha'
+WHERE c.name IN ('Alice', 'Bob')
+ON CONFLICT DO NOTHING;
   </code></pre>
 </div>
+
+<div class="column">
+  <div class="column-title">時刻特定の書き方</div>
+  <p class="column-note">
+    復旧時刻は、<code>SELECT now();</code> でメモした値を使います。手順書ではプレースホルダとして <code>XXXX-XX-XX XX:XX:XX</code> を使います。
+    例として「2026年2月23日 0時00分」を指定する場合は <code>recovery_target_time = '2026-02-23 00:00:00'</code> と書きます。
+  </p>
+</div>
+
+<h2>7. SQLドリル</h2>
+
+<h3>ex-03_1：WHERE句漏れで論理削除フラグを全件更新</h3>
+<p>
+特定キャラクタだけを論理削除する予定が、<code>WHERE</code> を書き忘れて全件に <code>deleted_at</code> を設定してしまう事故を再現します。
+</p>
+<pre><code class="language-sql">
+SELECT now();
+
+BEGIN;
+UPDATE x_characters
+SET deleted_at = LOCALTIMESTAMP(0);
+COMMIT;
+</code></pre>
+
+<h3>ex-03_2：運営配布INSERTの二重実行</h3>
+<p>
+運営配布（システム→キャラクタ）を誤って2回実行し、<code>x_gold_transfers</code> に重複履歴を作るケースです。
+</p>
+<pre><code class="language-sql">
+SELECT now();
+
+BEGIN;
+INSERT INTO x_gold_transfers (from_character_id, to_character_id, amount, transferred_at)
+SELECT NULL, character_id, 1000, LOCALTIMESTAMP(0)
+FROM x_characters
+WHERE deleted_at IS NULL;
+COMMIT;
+
+-- 同じ処理をもう1回実行して誤りを再現
+BEGIN;
+INSERT INTO x_gold_transfers (from_character_id, to_character_id, amount, transferred_at)
+SELECT NULL, character_id, 1000, LOCALTIMESTAMP(0)
+FROM x_characters
+WHERE deleted_at IS NULL;
+COMMIT;
+</code></pre>
+
+<h3>ex-03_3：所属テーブルの物理削除</h3>
+<p>
+特定キャラクタの所属だけ外すつもりが、誤った条件で削除してしまう事故を再現します。
+</p>
+<pre><code class="language-sql">
+SELECT now();
+
+BEGIN;
+DELETE FROM x_guild_characters
+WHERE character_id IN (
+  SELECT character_id FROM x_characters WHERE name IN ('Alice', 'Bob')
+);
+COMMIT;
+</code></pre>
+
+<h3>ex-03_4：<code>x_guilds</code> テーブルの誤削除</h3>
+<p>
+作業用テーブルを削除するつもりで、誤って本表を削除するケースです。
+</p>
+<pre><code class="language-sql">
+SELECT now();
+
+DROP TABLE x_guilds;
+</code></pre>
+
+<h3>ex-03_5：レベル更新ロジックの誤適用</h3>
+<p>
+一部キャラクタだけの調整のつもりが、全員を上限レベルへ更新してしまうケースです。
+</p>
+<pre><code class="language-sql">
+SELECT now();
+
+BEGIN;
+UPDATE x_characters
+SET level = 255
+WHERE deleted_at IS NULL;
+COMMIT;
+</code></pre>
+
+<h3>ex-03_6：送金履歴の全削除</h3>
+<p>
+絞り込み削除のつもりが、履歴全体を消してしまうケースです。
+</p>
+<pre><code class="language-sql">
+SELECT now();
+
+BEGIN;
+DELETE FROM x_gold_transfers;
+COMMIT;
+</code></pre>
+
+<h2 id="answers">8. 演習の解答例</h2>
+<p>
+本章では、各ドリルに対して <span class="highlight">コマンド例</span> と <span class="highlight">SQL解答例</span> を必ず示します。
+時刻は <code>XXXX-XX-XX XX:XX:XX</code> をプレースホルダとして記述し、具体例として <code>2026-02-23 00:00:00</code> も併記します。
+</p>
+
+<details>
+<summary>共通リカバリ・テンプレート（コマンド + SQL）</summary>
+<pre><code class="language-bash">
+# 1) 復旧時刻を設定（プレースホルダ）
+docker exec -it db-postgres bash -c "echo \"restore_command = 'cp /backup/wal_archive/%f %p'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker exec -it db-postgres bash -c "echo \"recovery_target_timeline = 'latest'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker exec -it db-postgres bash -c "echo \"recovery_target_action = 'pause'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+
+# 2) 具体例（2026年2月23日 0時00分）
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = '2026-02-23 00:00:00'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+
+# 3) recovery.signal の作成と再起動
+docker exec -it db-postgres bash -c "touch /var/lib/postgresql/data/recovery.signal"
+docker restart db-postgres
+  </code></pre>
+<pre><code class="language-sql">
+-- 復旧確認SQL
+SELECT pg_is_in_recovery();
+SELECT pg_last_xact_replay_timestamp();
+
+-- pause の場合のみ通常稼働へ移行
+SELECT pg_wal_replay_resume();
+  </code></pre>
+</details>
+
+<h3>ex-03_1 の解答例</h3>
+<details>
+  <summary>WHERE句漏れで deleted_at を全件更新した場合</summary>
+  <pre><code class="language-bash">
+# 復旧時刻を「誤UPDATE直前」に設定
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker restart db-postgres
+  </code></pre>
+  <pre><code class="language-sql">
+-- 具体例: 2026/02/23 00:00:00 を使う場合
+-- recovery_target_time = '2026-02-23 00:00:00'
+
+-- 検証
+SELECT character_id, name, deleted_at
+FROM x_characters
+ORDER BY character_id;
+  </code></pre>
+</details>
+
+<h3>ex-03_2 の解答例</h3>
+<details>
+  <summary>運営配布INSERTを二重実行した場合</summary>
+  <pre><code class="language-bash">
+# 2回目INSERT直前の時刻へ戻す
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker restart db-postgres
+  </code></pre>
+  <pre><code class="language-sql">
+-- 検証: 同一amountの重複が解消されているか確認
+SELECT to_character_id, amount, COUNT(*)
+FROM x_gold_transfers
+GROUP BY to_character_id, amount
+ORDER BY to_character_id, amount;
+  </code></pre>
+</details>
+
+<h3>ex-03_3 の解答例</h3>
+<details>
+  <summary>x_guild_characters を誤削除した場合</summary>
+  <pre><code class="language-bash">
+# DELETE直前の時刻へ戻す
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker restart db-postgres
+  </code></pre>
+  <pre><code class="language-sql">
+-- 検証: Alice/Bob の所属が復活しているか
+SELECT gc.guild_id, gc.character_id, c.name
+FROM x_guild_characters gc
+JOIN x_characters c ON c.character_id = gc.character_id
+WHERE c.name IN ('Alice', 'Bob')
+ORDER BY gc.guild_id, gc.character_id;
+  </code></pre>
+</details>
+
+<h3>ex-03_4 の解答例</h3>
+<details>
+  <summary>DROP TABLE x_guilds の復旧</summary>
+  <pre><code class="language-bash">
+# DROP実行直前へ戻す
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker restart db-postgres
+  </code></pre>
+  <pre><code class="language-sql">
+-- 検証: テーブルとデータが存在するか
+\dt x_guilds
+SELECT COUNT(*) FROM x_guilds;
+  </code></pre>
+</details>
+
+<h3>ex-03_5 の解答例</h3>
+<details>
+  <summary>level を全件255へ更新した場合</summary>
+  <pre><code class="language-bash">
+# UPDATE直前へ戻す
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker restart db-postgres
+  </code></pre>
+  <pre><code class="language-sql">
+-- 検証: レベル分布が元に戻っているか
+SELECT level, COUNT(*)
+FROM x_characters
+GROUP BY level
+ORDER BY level;
+  </code></pre>
+</details>
+
+<h3>ex-03_6 の解答例</h3>
+<details>
+  <summary>x_gold_transfers を全削除した場合</summary>
+  <pre><code class="language-bash">
+# DELETE直前へ戻す
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" >> /var/lib/postgresql/data/postgresql.auto.conf"
+docker restart db-postgres
+  </code></pre>
+  <pre><code class="language-sql">
+-- 検証: 履歴件数が0以外に戻っているか
+SELECT COUNT(*) AS transfer_count
+FROM x_gold_transfers;
+  </code></pre>
 </details>
 
 <hr>
