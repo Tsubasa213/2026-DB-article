@@ -37,7 +37,8 @@
 <a href="https://takeshiwada1980.github.io/DB-2025/lecture12.html#%E3%83%90%E3%83%83%E3%82%A2%E3%83%83%E3%83%97%E3%81%A8%E3%83%AA%E3%82%B9%E3%83%88%E3%82%A2">第12回講義: バックアップとリストア</a>
 </p>
 
-<h3>2.1 バックアップ/リストアの復習</h3>
+<h2>3. 前提知識の復習</h2>
+<h3>3.1 バックアップ/リストアの復習</h3>
 <p>
 PITRの前に、基本のバックアップ/リストアを整理します。ここでは<strong>論理バックアップ</strong>を中心に扱い、SQLとして取り出す方式を確認します。
 </p>
@@ -215,14 +216,14 @@ psql -d mydb -f backup.sql
   <li>手順は短く書くより、<span class="highlight">やること・やらないこと</span>を明示する</li>
 </ul>
 
-<h3>定着確認（第2章）</h3>
+<h3>定着確認（第3章）</h3>
 <ul>
   <li>論理バックアップだけで時点指定復旧は<span class="masked">できない</span>。</li>
   <li>PITRには<span class="masked">物理バックアップ + WAL</span>の組み合わせが必要です。</li>
   <li>復元後は件数確認などの<span class="masked">整合性チェック</span>を必ず行う。</li>
 </ul>
 
-<h2>3. PITRの全体像</h2>
+<h2>4. PITRの全体像</h2>
 <p>
 PITRは「<span class="highlight-strong">ベースバックアップ</span> + <span class="highlight-strong">WALアーカイブ</span> + <span class="highlight-strong">復旧設定</span>」の組み合わせで成立します。ベースバックアップはある時点の完全コピー、WALはそれ以降の更新履歴です。復旧時には戻す時点を指定します。
 </p>
@@ -232,7 +233,7 @@ PITRは「<span class="highlight-strong">ベースバックアップ</span> + <s
   <li>復旧設定：<code>restore_command</code> と <code>recovery_target_time</code></li>
 </ul>
 
-<h3>3.1 PITRを使う利点</h3>
+<h3>4.1 PITRを使う利点</h3>
 <p>
 PITRの利点は<span class="highlight-strong">特定時点への復旧</span>ができることです。誤ってテーブルを削除した場合でも、削除直前の時点に復旧できます。
 </p>
@@ -253,7 +254,7 @@ PITRはベースバックアップがなければ成立しません。基本の�
   </p>
 </div>
 
-<h3>3.2 WALの仕組み</h3>
+<h3>4.2 WALの仕組み</h3>
 <p>
 WALは<span class="highlight">先にログを書いてから実データを更新する</span>仕組みです。障害発生時でもログを再生すれば同じ状態を再現できます。PITRはこのWALを時系列で適用し、指定時刻で停止します。
 </p>
@@ -286,7 +287,7 @@ WALが残っていても<span class="highlight">WALだけでは復旧できな�
   </p>
 </div>
 
-<h3>3.3 ベースバックアップの役割</h3>
+<h3>4.3 ベースバックアップの役割</h3>
 <p>
 WALだけでは復旧できません。<span class="highlight-strong">起点となるスナップショット</span>が必要です。
 WALは差分情報のため、完全コピーがなければ復元できません。
@@ -295,7 +296,7 @@ WALは差分情報のため、完全コピーがなければ復元できませ�
 ベースバックアップが古いと復旧が長引くため、<span class="highlight">取得間隔の見直し</span>が重要です。
 </p>
 
-<h3>3.4 復旧ターゲットの種類</h3>
+<h3>4.4 復旧ターゲットの種類</h3>
 <p>
 PITRは時刻以外にも停止位置を指定できます。
 </p>
@@ -312,7 +313,7 @@ PITRは時刻以外にも停止位置を指定できます。
   </p>
 </div>
 
-<h3>3.4.1 タイムラインの考え方</h3>
+<h3>4.4.1 タイムラインの考え方</h3>
 <p>
 PostgreSQLにおけるタイムラインは、<span class="highlight">WAL再生の履歴系統</span>を識別・管理するための概念です。
 通常運用時は1本の履歴を進みますが、PITRで過去時点に復旧して再開すると、新しい履歴系統が作られます。
@@ -343,7 +344,7 @@ Timeline 2:               ----D----E----(復旧後の新しい履歴)
   </p>
 </div>
 
-<h3>3.5 「ダンプ復元」との違い</h3>
+<h3>4.5 「ダンプ復元」との違い</h3>
 <p>
 <code>pg_dump</code> + <code>psql</code> の復元は「ダンプ取得時点へ戻す」方式であり、時点指定には対応できません。
 一方、PITRはベースバックアップとWALを組み合わせることで、「誤操作直前」など細かい時点へ戻せます。
@@ -362,7 +363,7 @@ Timeline 2:               ----D----E----(復旧後の新しい履歴)
   </p>
 </div>
 
-<h3>3.6 運用での考え方</h3>
+<h3>4.6 運用での考え方</h3>
 <p>
 PITRは運用設計とセットで扱います。<span class="highlight-strong">RPO</span>は失ってよい最大時間、<span class="highlight-strong">RTO</span>は復旧に許される時間です。これらを意識すると、
 どの頻度でバックアップし、どれだけWALを保存すべきかを判断できます。
@@ -371,7 +372,7 @@ PITRは運用設計とセットで扱います。<span class="highlight-strong">
   <li>RPOが短いほどWAL欠落を許容できません。</li>
   <li>RTOが短いほど復旧手順の自動化が必要です。</li>
 </ul>
-<h3>3.7 事例で見るPITR</h3>
+<h3>4.7 事例で見るPITR</h3>
 <p>
 午前中の運用作業で、担当者が間違えて重要テーブルを削除してしまったとします。監視にはエラーが上がり、
 ユーザから「データが消えた」と連絡が入りました。ここで求められるのは、<span class="highlight">直前の時点に戻す</span>ことです。
@@ -391,7 +392,7 @@ PITRはこの状況で最短復旧を実現するための有力な選択肢に�
   </p>
 </div>
 
-<h3>3.8 失敗しやすいパターンと回避策</h3>
+<h3>4.8 失敗しやすいパターンと回避策</h3>
 <ul>
   <li>WALアーカイブの保存先が満杯 → <span class="highlight">容量監視</span>とローテーションを設計する</li>
   <li>ベースバックアップの世代が古すぎる → <span class="highlight">定期取得</span>を必須化する</li>
@@ -399,7 +400,7 @@ PITRはこの状況で最短復旧を実現するための有力な選択肢に�
   <li>復旧後に書き込みできない → <span class="highlight"><code>recovery_target_action</code></span> と <span class="highlight"><code>pg_wal_replay_resume()</code></span> を確認する</li>
 </ul>
 
-<h3>3.9 時系列で見るPITR</h3>
+<h3>4.9 時系列で見るPITR</h3>
 <p>
 PITRは「まず起点を用意し、次に更新履歴を順に再生し、最後に指定時点で止める」流れです。
 </p>
@@ -433,14 +434,14 @@ PITRは「まず起点を用意し、次に更新履歴を順に再生し、最�
   </p>
 </div>
 
-<h3>定着確認（第3章）</h3>
+<h3>定着確認（第4章）</h3>
 <ul>
   <li>WALは基本的に<span class="masked">REDOログ</span>として機能する。</li>
   <li>WALだけでは復旧できず、<span class="masked">ベースバックアップ</span>が起点として必要です。</li>
   <li>時点指定復旧で厳密な位置を指定する場合は<span class="masked">LSN</span>が有効です。</li>
 </ul>
 
-<h3>3.10 時刻特定の手法・自動ログと手動記録</h3>
+<h3>4.10 時刻特定の手法・自動ログと手動記録</h3>
 <p>
 PITRで最も難しいのは「何時何分何秒に戻すべきか」を特定することです。これには主に2つの自動ログが活用されます。
 </p>
@@ -456,7 +457,7 @@ PITRで最も難しいのは「何時何分何秒に戻すべきか」を特定�
     今回の演習で使用する <code>x_gold_transfers</code> には、データ挿入時に自動で時刻を記録する <code>transferred_at</code> カラムが定義されています。このように、データそのものに「いつ作られたか」が自動で刻まれる設計にしておくことも、復旧時の重要な手がかりとなります。
   </p>
 </div>
-<h2>4. ハンズオン学習</h2>
+<h2>5. ハンズオン学習</h2>
 <p>
 この章では、誤操作の直前時刻に戻せることを目標に、PITRの設定から復旧確認までを実施します。
 </p>
@@ -472,7 +473,7 @@ PITRで最も難しいのは「何時何分何秒に戻すべきか」を特定�
 </div>
 
 
-<h3>4.1 ホストとコンテナの境界を理解する</h3>
+<h3>5.1 ホストとコンテナの境界を理解する</h3>
 <p>
   ハンズオンを進めるにあたり、「自分のPC（ホスト環境）」と「Dockerコンテナ内部」の違いを正確に把握することが非常に重要です。
 </p>
@@ -508,7 +509,7 @@ touch sql/tmp_pitr.sql
   ※ コンテナ内部のファイル（<code>postgresql.auto.conf</code> や <code>recovery.signal</code>）に対する作成・編集については、この後のリカバリ手順の中で <code>docker exec</code> コマンドを用いて実行します。
 </p>
 
-<h3>4.2 演習で使用するテーブル</h3>
+<h3>5.2 演習で使用するテーブル</h3>
 <p>
   本章のハンズオンでは、PITRが正常に機能するかを確認するため、専用の練習用テーブルを使用します。
 </p>
@@ -516,14 +517,14 @@ touch sql/tmp_pitr.sql
   <li><strong>pitr_demo</strong>：導入ハンズオン用。データの挿入と削除を行い、指定した時刻へ正確に戻れるかをテストします。</li>
 </ul>
 
-<h3>4.3 実行の全体フロー</h3>
+<h3>5.3 実行の全体フロー</h3>
 <ol>
   <li><strong>設定と再起動</strong>：コンテナ内の <code>postgresql.auto.conf</code> にリカバリ設定を書き込み、コンテナを再起動します。</li>
   <li><strong>演習実行と記録</strong>：作成した <code>sql/tmp_pitr.sql</code> を <code>npm run sql sql/tmp_pitr.sql</code> で実行し、「誤操作が起きた時刻」を正確にメモします。</li>
   <li><strong>通常稼働への復帰</strong>：データが復旧したことを確認した後、<code>SELECT pg_wal_replay_resume();</code> を実行して書き込み可能な状態へ移行します。</li>
 </ol>
 
-<h3>4.4 作業用ディレクトリの準備</h3>
+<h3>5.4 作業用ディレクトリの準備</h3>
 <p>バックアップ先とアーカイブ先を明示的に作成します。</p>
 <p>
 このハンズオンは、講義資料どおりに構築済みの <span class="highlight">DB-PostgreSQL</span> フォルダを前提とします。
@@ -557,7 +558,7 @@ mkdir -p /backup/base
 mkdir -p /backup/wal_archive
 </code></pre>
 
-<h3>4.5 WALアーカイブ設定の確認</h3>
+<h3>5.5 WALアーカイブ設定の確認</h3>
 <p>
 まずは現在の設定を確認します。設定ファイルを直接編集する場合は、操作権限と再起動が必要になるため注意してください。
 </p>
@@ -571,7 +572,7 @@ mkdir -p /backup/wal_archive
 </div>
 <pre><code class="language-bash">
 # 例: postgresql.auto.conf へ追記。コンテナ内で実行
-docker exec -it db-postgres bash -c "echo \"recovery_target_time = '2026-01-27 10:30:00'\" &gt;&gt; /var/lib/postgresql/data/postgresql.auto.conf"
+docker exec -it db-postgres bash -c "echo \"recovery_target_time = 'XXXX-XX-XX XX:XX:XX'\" &gt;&gt; /var/lib/postgresql/data/postgresql.auto.conf"
 docker exec -it db-postgres bash -c "echo \"recovery_target_timeline = 'latest'\" &gt;&gt; /var/lib/postgresql/data/postgresql.auto.conf"
 docker exec -it db-postgres bash -c "echo \"recovery_target_action = 'promote'\" &gt;&gt; /var/lib/postgresql/data/postgresql.auto.conf"
 docker exec -it db-postgres bash -c "echo \"restore_command = 'cp /backup/wal_archive/%f %p'\" &gt;&gt; /var/lib/postgresql/data/postgresql.auto.conf"
@@ -597,7 +598,8 @@ SHOW archive_command;
 SHOW wal_level;
 </code></pre>
 
-<p>postgresql.conf の代表的な設定例です。環境に合わせて調整してください。</p>
+<p><span class="critical-text">以下は一般的な知識としての参考設定です。今回のDocker演習では、基本的に <code>postgresql.auto.conf</code> への追記のみで進め、<code>postgresql.conf</code> は直接変更しないでください。</span></p>
+<p>postgresql.conf の代表的な設定例です。</p>
 <pre><code class="language-ini">
 archive_mode = on
 archive_command = 'test ! -f /backup/wal_archive/%f &amp;&amp; cp %p /backup/wal_archive/%f'
@@ -632,7 +634,7 @@ wal_level = replica
   </p>
 </div>
 
-<h3>4.6 ベースバックアップの取得</h3>
+<h3>5.6 ベースバックアップの取得</h3>
 <p>ベースバックアップは復旧の起点です。まず取得してください。</p>
 <pre><code class="language-bash">
 pg_basebackup -D /backup/base -Fp -Xs -P
@@ -641,8 +643,8 @@ pg_basebackup -D /backup/base -Fp -Xs -P
 <strong>-D</strong> は出力先、<strong>-Fp</strong> はプレーン形式、<strong>-Xs</strong> はWALのストリーミング取得、<strong>-P</strong> は進捗表示。
 </p>
 
-<h3>4.7 WAL生成とアーカイブ確認</h3>
-<h4>4.7.1 テスト用テーブル作成</h4>
+<h3>5.7 WAL生成とアーカイブ確認</h3>
+<h4>5.7.1 テスト用テーブル作成</h4>
 <pre><code class="language-sql">
 CREATE TABLE pitr_demo (
   id SERIAL PRIMARY KEY,
@@ -651,7 +653,7 @@ CREATE TABLE pitr_demo (
 );
 </code></pre>
 
-<h4>4.7.2 変更を発生させる</h4>
+<h4>5.7.2 変更を発生させる</h4>
 <pre><code class="language-sql">
 INSERT INTO pitr_demo (message) VALUES
   ('first'),
@@ -659,17 +661,17 @@ INSERT INTO pitr_demo (message) VALUES
   ('third');
 </code></pre>
 
-<h4>4.7.3 WALアーカイブの生成を促す</h4>
+<h4>5.7.3 WALアーカイブの生成を促す</h4>
 <pre><code class="language-sql">
 SELECT pg_switch_wal();
 </code></pre>
 
-<h4>4.7.4 アーカイブ確認</h4>
+<h4>5.7.4 アーカイブ確認</h4>
 <pre><code class="language-bash">
 ls -la /backup/wal_archive
 </code></pre>
 
-<h3>4.8 障害発生の再現</h3>
+<h3>5.8 障害発生の再現</h3>
 <p>削除直前の時刻を記録してください。復旧ターゲットとして使用します。</p>
 <pre><code class="language-sql">
 SELECT now();
@@ -681,11 +683,12 @@ SELECT * FROM pitr_demo ORDER BY id;
 DROP TABLE pitr_demo;
 </code></pre>
 
-<h3>4.9 PITRによる復旧</h3>
-<h4>4.9.1 目標時刻の設定</h4>
+<h3>5.9 PITRによる復旧</h3>
+<h4>5.9.1 目標時刻の設定</h4>
 <p>削除直前の時刻をメモして、その時刻へ復旧してください。</p>
+<p><span class="critical-text">必ず先ほどメモした自分の時刻に書き換えてください。以下の日時をそのまま実行しないでください。</span></p>
 <pre><code class="language-ini">
-recovery_target_time = '2026-01-27 10:30:00'
+recovery_target_time = 'XXXX-XX-XX XX:XX:XX'
 recovery_target_timeline = 'latest'
 recovery_target_action = 'promote'
 </code></pre>
@@ -698,7 +701,7 @@ recovery_target_action = 'promote'
 SELECT pg_wal_replay_resume();
 </code></pre>
 
-<h4>4.9.2 リストア用の基本設定</h4>
+<h4>5.9.2 リストア用の基本設定</h4>
 <pre><code class="language-ini">
 restore_command = 'cp /backup/wal_archive/%f %p'
 </code></pre>
@@ -713,7 +716,7 @@ restore_command = 'cp /backup/wal_archive/%f %p'
   </p>
 </div>
 
-<h4>4.9.3 復旧シグナルの用意</h4>
+<h4>5.9.3 復旧シグナルの用意</h4>
 <pre><code class="language-bash">
 touch recovery.signal
 </code></pre>
@@ -739,12 +742,12 @@ SELECT pg_wal_replay_resume();
   </p>
 </div>
 
-<h4>4.9.4 復旧後の確認</h4>
+<h4>5.9.4 復旧後の確認</h4>
 <pre><code class="language-sql">
 SELECT * FROM pitr_demo ORDER BY id;
 </code></pre>
 
-<h4>4.9.5 復旧状況の監視コマンド</h4>
+<h4>5.9.5 復旧状況の監視コマンド</h4>
 <pre><code class="language-sql">
 -- 復旧中かどうか
 SELECT pg_is_in_recovery();
@@ -757,14 +760,14 @@ SELECT pg_last_wal_replay_lsn();
 SELECT pg_last_xact_replay_timestamp();
 </code></pre>
 
-<h3>定着確認（第4章）</h3>
+<h3>定着確認（第5章）</h3>
 <ul>
   <li><span class="masked">restore_command</span> の設定ミスは<span class="masked">復旧停止</span>の原因になりやすい。</li>
   <li>復旧手順では <span class="masked">設定反映 → recovery.signal作成 → 起動</span> の順序を守る。</li>
   <li>復旧状態の確認には <span class="masked">pg_is_in_recovery()</span> を使う。</li>
 </ul>
 
-<h2>5. 注意点</h2>
+<h2>6. 注意点</h2>
 <ul>
   <li>アーカイブ先のパスと権限を確認する。</li>
   <li><code>archive_command</code> の成否をログで確認する。</li>
@@ -774,7 +777,7 @@ SELECT pg_last_xact_replay_timestamp();
   <li>復旧後にアプリが動かない場合は<span class="highlight">接続先が旧DBのまま</span>でないか確認する。</li>
 </ul>
 
-<h3>5.1 WALの掃除</h3>
+<h3>6.1 WALの掃除</h3>
 <p>
 WALアーカイブを溜め続けるとディスクが溢れます。古いWALを削除する場合は
 <code>pg_archivecleanup</code> の利用を検討してください。
@@ -792,14 +795,14 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
   </p>
 </div>
 
-<h3>定着確認（第5章）</h3>
+<h3>定着確認（第6章）</h3>
 <ul>
   <li><span class="masked">archive_command</span> の異常時は <span class="masked">パス・権限・既存ファイル衝突・ログ</span> の順で確認する。</li>
   <li>WAL削除前には <span class="masked">復旧可能範囲</span> を先に定義する。</li>
   <li>復旧後に不整合がある場合は <span class="masked">接続先誤りやWAL欠落</span> を疑う。</li>
 </ul>
 
-<h2>6. SQLドリル / 演習の準備</h2>
+<h2>7. SQLドリル / 演習の準備</h2>
 <p>
 本演習は、<code>from-teacher/10/create-x_db.sql</code> で定義される実スキーマ（<code>x_jobs</code> / <code>x_characters</code> / <code>x_guilds</code> / <code>x_guild_characters</code> / <code>x_items</code> / <code>x_character_items</code> / <code>x_gold_transfers</code>）を前提に進めます。
 本章では、誤操作を意図的に発生させ、PITRで戻す手順を確認します。
@@ -816,8 +819,8 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
 <div class="column">
   <div class="column-title">解答例の場所</div>
   <p class="column-note">
-    各演習の解答は <a href="#answers">第8章「演習の解答例」</a> にまとめています。
-    第8章には、各問題について <span class="highlight">コマンド例</span> と <span class="highlight">SQL解答例</span> の両方を掲載しています。
+    各演習の解答は <a href="#answers">第9章「演習の解答例」</a> にまとめています。
+    第9章には、各問題について <span class="highlight">コマンド例</span> と <span class="highlight">SQL解答例</span> の両方を掲載しています。
   </p>
 </div>
 
@@ -834,7 +837,8 @@ npm run sql from-teacher/10/create-x_db.sql
 <div class="column">
   <div class="column-title">最小データの投入（ドリル実行前）</div>
   <p class="column-note">
-    <code>create-x_db.sql</code> はテーブル定義が中心です。以下の最小データを入れてからドリルを実施してください。
+    <code>create-x_db.sql</code> はテーブル定義が中心です。<span class="highlight">実行直後はテーブルが空のため、ドリル検証用の初期データをここで作成します。</span>
+    以下の最小データを入れてからドリルを実施してください。
   </p>
   <pre><code class="language-sql">
 INSERT INTO x_jobs (name, attack_gain, defense_gain, magic_gain)
@@ -873,7 +877,7 @@ ON CONFLICT DO NOTHING;
   </p>
 </div>
 
-<h2>7. SQLドリル</h2>
+<h2>8. SQLドリル</h2>
 
 <h3>ex-03_1：WHERE句漏れで論理削除フラグを全件更新</h3>
 <p>
@@ -962,7 +966,7 @@ DELETE FROM x_gold_transfers;
 COMMIT;
 </code></pre>
 
-<h2 id="answers">8. 演習の解答例</h2>
+<h2 id="answers">9. 演習の解答例</h2>
 <p>
 本章では、各ドリルに対して <span class="highlight">コマンド例</span> と <span class="highlight">SQL解答例</span> を必ず示します。
 時刻は <code>XXXX-XX-XX XX:XX:XX</code> をプレースホルダとして記述し、具体例として <code>2026-02-23 00:00:00</code> も併記します。

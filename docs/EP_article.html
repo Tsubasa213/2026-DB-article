@@ -85,6 +85,7 @@ CREATE TABLE orders (
 <p>
 行数が少ないと計画差が出にくいため、customers 10万件、orders 100万件を投入します。
 </p>
+<p><span class="critical-text">※ この処理はPCスペックにより数秒〜数十秒ほど時間がかかる場合があります。実行中に一時的に固まったように見えても、そのまま待ってください。</span></p>
 <pre><code class="language-sql">
 INSERT INTO customers (customer_id, prefecture, segment, created_at)
 SELECT
@@ -158,6 +159,11 @@ EXPLAIN は「実行前の見込み計画」、EXPLAIN ANALYZE は「実際に�
   <li><span class="highlight">actual rows</span>：実際の処理行数</li>
   <li><span class="highlight">loops</span>：ノードが繰り返された回数</li>
 </ul>
+<p>
+ここで最も誤解しやすい点は、<span class="highlight">actual rows は1ループあたりの平均行数</span>として表示される場合があることです。
+そのため、実際の総処理行数は <span class="highlight">actual rows × loops</span> で読み取るのが基本です。
+たとえば <code>actual rows=120</code>、<code>loops=50</code> なら、合計では約6,000行を処理したと解釈できます。
+</p>
 
 <h3>3.2 単純フィルタ</h3>
 <p>
@@ -219,24 +225,55 @@ SELECT o.order_id, o.customer_id, o.amount
 FROM orders o
 WHERE o.status = 'paid'
   AND o.order_date &gt;= current_date - 30;
+</code></pre>
+<p>
+最初に <span class="highlight">Node Type</span>、<span class="highlight">actual rows</span>、<span class="highlight">loops</span> を確認してください。
+この段階で「どの処理が何回実行されているか」を把握できます。
+</p>
+<pre><code class="language-text">
+Limit  (actual time=12.4..12.9 rows=200 loops=1)
+  -&gt;  Index Scan using idx_orders_status_date on orders o
+      (actual time=12.3..12.8 rows=200 loops=1)
+</code></pre>
+<p>
+上のように <span class="highlight">Index Scan</span> へ切り替わっているか、
+<span class="highlight">actual time</span> が改善しているかを見てください。
+</p>
 
+<pre><code class="language-sql">
 -- 2) 統計情報（偏り・distinct）を確認
 SELECT schemaname, tablename, attname, n_distinct, most_common_vals, most_common_freqs
 FROM pg_stats
 WHERE tablename = 'orders'
   AND attname IN ('status', 'order_date', 'shipping_pref');
+</code></pre>
+<p>
+ここでは <span class="highlight">most_common_vals</span> と <span class="highlight">most_common_freqs</span> を見て、
+対象条件の偏りを確認してください。偏りが大きい場合は、計画が急に切り替わる原因になります。
+</p>
 
+<pre><code class="language-sql">
 -- 3) インデックス定義を確認
 SELECT indexname, indexdef
 FROM pg_indexes
 WHERE tablename = 'orders'
 ORDER BY indexname;
+</code></pre>
+<p>
+対象SQLの <code>WHERE</code> / <code>ORDER BY</code> とインデックス列順が一致しているかを確認してください。
+一致していない場合、インデックスが存在しても使われないことがあります。
+</p>
 
+<pre><code class="language-sql">
 -- 4) テーブル統計の更新時刻・件数感を確認
 SELECT relname, n_live_tup, n_dead_tup, last_analyze, last_autoanalyze
 FROM pg_stat_user_tables
 WHERE relname IN ('orders', 'customers');
 </code></pre>
+<p>
+<span class="highlight">last_analyze</span> が古い場合、rows推定が外れて不利な計画につながります。
+大量更新後は統計更新の実施有無を必ず確認してください。
+</p>
 
 <div class="column">
   <div class="column-title">テンプレート運用のコツ</div>
@@ -245,15 +282,20 @@ WHERE relname IN ('orders', 'customers');
   </p>
 </div>
 
-<details>
-  <summary>補足：BUFFERSオプションで何が分かるか</summary>
-  <p>
-    BUFFERS では、どれだけキャッシュに当たったか、どれだけディスクを読んだかを確認できます。
-    たとえば <span class="highlight">shared hit</span> が多ければメモリ上で処理できている可能性が高く、
-    <span class="highlight">shared read</span> が多ければI/O待ちがボトルネックになっている可能性があります。
-    同じSQLでも、処理時間の差がCPU由来かI/O由来かを切り分ける際に有効です。
-  </p>
-</details>
+<h3>3.6 BUFFERSによるI/Oとキャッシュの切り分け</h3>
+<p>
+<code>BUFFERS</code> は、遅延の主因がディスクI/Oか、CPU処理かを切り分けるための重要情報です。
+<span class="highlight">shared hit</span> が多い場合はキャッシュ命中中心、
+<span class="highlight">shared read</span> が多い場合は実ディスク読み込み中心と判断できます。
+</p>
+<pre><code class="language-text">
+Seq Scan on orders  (actual time=0.120..820.331 rows=250000 loops=1)
+Buffers: shared hit=1200 read=18450
+</code></pre>
+<p>
+この例では <span class="highlight">read が多い</span>ため、I/O待ちが主要因である可能性が高いです。
+同じSQLを再実行して <span class="highlight">hit が増え read が減る</span>なら、キャッシュ効果が確認できます。
+</p>
 
 <div class="column">
   <div class="column-title">演習：同じSQLを3回実行したとき、どの値を比較しますか？</div>
@@ -297,6 +339,15 @@ SELECT order_id, amount
 FROM orders
 WHERE order_date &gt;= current_date - 7;
 </code></pre>
+<pre><code class="language-text">
+Bitmap Heap Scan on orders  (actual time=8.221..35.744 rows=5120 loops=1)
+  Recheck Cond: (order_date &gt;= (CURRENT_DATE - 7))
+  Buffers: shared hit=980 read=120
+</code></pre>
+<p>
+注目点は <span class="highlight">Node Type</span> と <span class="highlight">rows</span>、
+そして <span class="highlight">Buffers</span> の read/hit 比率です。これらを前回結果と比較してください。
+</p>
 <p>
 例えば、100万件中「直近7日」が約5,000件（0.5%）なら、該当ページだけを効率よく拾えるIndex系ノードが有利です。
 逆に20万件以上が該当する条件では、ページを広範囲に読む必要があるためSeq Scanへ戻る可能性が高くなります。
@@ -368,6 +419,15 @@ SELECT *
 FROM orders
 WHERE status = 'canceled';
 </code></pre>
+<pre><code class="language-text">
+Index Scan using idx_orders_status on orders  (actual time=0.201..42.105 rows=20034 loops=1)
+  Index Cond: (status = 'canceled'::text)
+</code></pre>
+<p>
+このサンプルでは <span class="highlight">Index Scan</span> への切り替わりが確認できます。
+比較時は <span class="highlight">actual time</span> と <span class="highlight">rows</span> の両方を見て、
+単にNode名だけでなく実効性能で判断してください。
+</p>
 <p>
 status='canceled' が低頻度なら Index Scan が効きやすくなります。逆に頻度が高すぎると Seq Scan が選ばれます。
 </p>
@@ -583,6 +643,7 @@ Nested Loopが選ばれて内側アクセスが過剰に発生することがあ
 <p>
 ここでは「あえて遅い状態」を作り、<span class="highlight">統計情報が古いと最悪の計画が選ばれる</span>ケースを再現します。
 </p>
+<p><span class="critical-text">※ この節の <code>UPDATE</code> は100万件規模に影響するため、PCスペックによって数秒〜数十秒かかる場合があります。処理中はそのまま待機してください。</span></p>
 <div class="column">
   <div class="column-title">演習ステップ</div>
   <ul class="column-note">
