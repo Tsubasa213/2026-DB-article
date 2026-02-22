@@ -139,9 +139,9 @@ ANALYZE orders;
 
 <h3>定着確認（第2章）</h3>
 <ul>
-  <li>性能確認では <span class="masked">EXPLAIN ANALYZE</span> で実測を取る。</li>
-  <li>更新系SQLの検証は <span class="masked">本番ではなく検証環境</span> で行う。</li>
-  <li>比較時は <span class="masked">同一SQLを複数回実行</span> して中央値を見る。</li>
+  <li>性能確認では <span class="masked">EXPLAIN ANALYZE</span> で実測を取るべきである。</li>
+  <li>更新系SQLの検証は <span class="masked">本番ではなく検証環境</span> で行うべきである。</li>
+  <li>比較時は <span class="masked">同一SQLを複数回実行</span> し、中央値で判断すべきである。</li>
 </ul>
 
 <h2>3. EXPLAIN / ANALYZE の基本</h2>
@@ -160,6 +160,10 @@ EXPLAIN は「実行前の見込み計画」、EXPLAIN ANALYZE は「実際に�
 </ul>
 
 <h3>3.2 単純フィルタ</h3>
+<p>
+まず説明を先に確認します。プランナは「該当行が全体の何割か」を統計情報から推定し、
+ランダムI/O中心になるIndexアクセスと、順次読み取り中心になるSeq Scanを比較します。
+</p>
 <pre><code class="language-sql">
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT *
@@ -169,6 +173,11 @@ WHERE status = 'paid';
 <p>
 status列にインデックスがない場合、通常は Seq Scan が選ばれます。全件を確認して条件を満たす行だけ返すため、
 行数が増えるほど時間は増加しやすくなります。
+</p>
+<p>
+具体例として、100万件中25万件（25%）が <code>status='paid'</code> に該当する分布では、
+インデックスがあっても「大量ヒット + テーブル参照」のコストが高くなり、Seq Scanが有利になりやすいです。
+一方で1万件（1%）程度しかヒットしない条件なら、Index ScanやBitmap Heap Scanが選ばれやすくなります。
 </p>
 
 <div class="column">
@@ -191,6 +200,12 @@ status列にインデックスがない場合、通常は Seq Scan が選ばれ�
 <p>
 cost は時間（ms）そのものではなく、プランナ内部の評価値です。したがって cost が半分でも、実行時間が半分になるとは限りません。
 ただし同一環境・同一時点で候補プランを比べる指標としては有効です。
+</p>
+<p>
+cost には主に <code>seq_page_cost</code> と <code>random_page_cost</code>、CPU演算の重みが反映されます。
+つまり、同じデータ件数でも「連続読み取り中心か」「ランダム読み取り中心か」で評価が大きく変わります。
+実行時間との差分は、キャッシュ状態・同時実行・ストレージ性能の影響で発生するため、
+最終判断は必ず <code>EXPLAIN (ANALYZE, BUFFERS)</code> の実測で行う必要があります。
 </p>
 
 <h3>3.5 標準分析テンプレート（まずこれを実行）</h3>
@@ -250,9 +265,9 @@ WHERE relname IN ('orders', 'customers');
 
 <h3>定着確認（第3章）</h3>
 <ul>
-  <li>実行計画の初見では <span class="masked">Node Type / rows / actual rows / loops</span> を優先確認する。</li>
-  <li><code>cost</code> は <span class="masked">相対評価値</span> であり実時間と一致しない。</li>
-  <li>原因切り分けでは <span class="masked">buffers read/hit</span> を実行時間と併せて確認する。</li>
+  <li>実行計画の初見では <span class="masked">Node Type / rows / actual rows / loops</span> を優先確認すべきである。</li>
+  <li><code>cost</code> は <span class="masked">相対評価値</span> であり、実時間と一致しない前提で扱うべきである。</li>
+  <li>原因切り分けでは <span class="masked">buffers read/hit</span> を実行時間と併せて確認すべきである。</li>
 </ul>
 
 <h2>4. データ量と実行計画の変化</h2>
@@ -282,8 +297,18 @@ SELECT order_id, amount
 FROM orders
 WHERE order_date &gt;= current_date - 7;
 </code></pre>
+<p>
+例えば、100万件中「直近7日」が約5,000件（0.5%）なら、該当ページだけを効率よく拾えるIndex系ノードが有利です。
+逆に20万件以上が該当する条件では、ページを広範囲に読む必要があるためSeq Scanへ戻る可能性が高くなります。
+この切替点は統計情報とテーブル分布に依存するため、実データでの観測が不可欠です。
+</p>
 
 <h3>4.3 大規模データでの集計</h3>
+<p>
+集計は「入力をどう並べるか」「中間結果をどこに保持するか」で計画が変わります。
+都道府県のようにグループ数が少ない列では、HashAggregateでメモリ内集計できると速くなる傾向があります。
+一方、入力が既に整列済み、またはSortコストが低い場合はGroupAggregateが選ばれることがあります。
+</p>
 <pre><code class="language-sql">
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT shipping_pref, COUNT(*)
@@ -292,6 +317,11 @@ GROUP BY shipping_pref;
 </code></pre>
 <p>
 GroupAggregate と HashAggregate のどちらが出るかは、並び順やメモリ設定、推定行数に依存します。
+</p>
+<p>
+具体例として、<code>shipping_pref</code> が5種類に偏る分布なら、100万件入力でもハッシュ表は小さく保てます。
+ただし <code>work_mem</code> が不足するとハッシュがディスク退避し、想定より遅くなることがあります。
+そのため、Node名だけでなく <code>BUFFERS</code> と実行時間を併せて比較することが重要です。
 </p>
 
 <div class="column">
@@ -313,9 +343,9 @@ GroupAggregate と HashAggregate のどちらが出るかは、並び順やメ�
 
 <h3>定着確認（第4章）</h3>
 <ul>
-  <li>同一SQLでもデータ量で <span class="masked">Node Type が変わる</span> 可能性がある。</li>
-  <li>計画比較は <span class="masked">実行時間だけで判断しない</span>。</li>
-  <li>比較時は <span class="masked">rows誤差とBUFFERS(read/hit)</span> を同時に見る。</li>
+  <li>同一SQLでもデータ量で <span class="masked">Node Type が変わる</span> 可能性がある点を前提に評価すべきである。</li>
+  <li>計画比較は <span class="masked">実行時間だけで判断しない</span> のが原則である。</li>
+  <li>比較時は <span class="masked">rows誤差とBUFFERS(read/hit)</span> を同時に見るべきである。</li>
 </ul>
 
 <h2>5. インデックスの影響</h2>
@@ -340,6 +370,11 @@ WHERE status = 'canceled';
 </code></pre>
 <p>
 status='canceled' が低頻度なら Index Scan が効きやすくなります。逆に頻度が高すぎると Seq Scan が選ばれます。
+</p>
+<p>
+例えば100万件中 <code>canceled</code> が2万件（2%）なら、インデックス経由で必要行だけ辿る方が有利になりやすいです。
+一方で40万件（40%）が該当する分布では、インデックス経由のランダムアクセスが増え、Seq Scanの方が安く評価されることがあります。
+この違いが「インデックスは作れば必ず速いわけではない」理由です。
 </p>
 
 <h3>5.2 複合インデックス</h3>
@@ -402,9 +437,9 @@ WHERE status = 'canceled';
 
 <h3>定着確認（第5章）</h3>
 <ul>
-  <li>インデックス設計では <span class="masked">選択性と列順</span> を先に確認する。</li>
-  <li>複合インデックスは <span class="masked">先頭列条件</span> がないと効きにくい。</li>
-  <li>索引追加は検索性能だけでなく <span class="masked">更新コスト</span> も評価する。</li>
+  <li>インデックス設計では <span class="masked">選択性と列順</span> を先に確認すべきである。</li>
+  <li>複合インデックスは <span class="masked">先頭列条件</span> がないと効きにくい点を理解すべきである。</li>
+  <li>索引追加は検索性能だけでなく <span class="masked">更新コスト</span> も評価すべきである。</li>
 </ul>
 
 <h2>6. 統計情報と推定誤差</h2>
@@ -432,6 +467,12 @@ WHERE order_id % 10 &lt; 8;
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT * FROM orders WHERE status = 'paid';
 </code></pre>
+<p>
+この操作では、理論上は100万件のうち約80万件が <code>paid</code> になります。
+それでも統計が古いままだと、プランナは「まだ25%程度」と誤認し、
+不利なアクセス経路を選ぶ場合があります。<code>rows</code> と <code>actual rows</code> の乖離を観測すると、
+統計起因の問題を定量的に説明できます。
+</p>
 
 <h3>6.3 改善手順</h3>
 <pre><code class="language-sql">
@@ -479,9 +520,9 @@ ANALYZE orders;
 
 <h3>定着確認（第6章）</h3>
 <ul>
-  <li>rows と actual rows の乖離が大きい場合は <span class="masked">統計情報の古さ</span> を疑う。</li>
-  <li>偏った更新後は <code>ANALYZE</code> の実施が<span class="critical-text">必須</span>である。</li>
-  <li>列相関が強い場合は <span class="masked">extended statistics</span> を検討する。</li>
+  <li>rows と actual rows の乖離が大きい場合は <span class="masked">統計情報の古さ</span> を疑うべきである。</li>
+  <li>偏った更新後は <span class="masked">ANALYZE</span> の実施が必須である。</li>
+  <li>列相関が強い場合は <span class="masked">extended statistics</span> を検討すべきである。</li>
 </ul>
 
 <h2>7. 実行計画と実行時間の乖離</h2>
@@ -507,6 +548,11 @@ generic plan / custom plan の挙動にも注意します。
 </p>
 
 <h3>7.3 JOINでの落とし穴</h3>
+<p>
+JOINでは、外側入力の行数推定が少し外れるだけで最適解が変わることがあります。
+特に、Nested Loopは「外側が小さい」前提で高速化されるため、
+推定が過小だと内側探索が想定回数を超え、急激に遅くなる場合があります。
+</p>
 <pre><code class="language-sql">
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT c.prefecture, COUNT(*)
@@ -517,6 +563,12 @@ GROUP BY c.prefecture;
 </code></pre>
 <p>
 Hash Join と Nested Loop の選択は、外側行数推定に強く依存します。rows 誤差が大きいと不利なJOIN方式を選ぶ可能性があります。
+</p>
+<p>
+例えば、実際には20万件がJOIN対象なのに2万件と推定された場合、
+Nested Loopが選ばれて内側アクセスが過剰に発生することがあります。
+このようなケースでは、統計更新や条件見直しで推定精度を上げることが、
+単純なインデックス追加より有効な対策になることがあります。
 </p>
 
 <h3>7.4 計画比較の型を作る</h3>
@@ -604,8 +656,8 @@ LIMIT 200;
 <h3>定着確認（第7章）</h3>
 <ul>
   <li>同一計画でも実行時間差の主因は <span class="masked">キャッシュ/I/O/同時実行</span> である。</li>
-  <li>再現実験では <span class="masked">基準計測→要因変更→再計測</span> の順序を守る。</li>
-  <li>継続監視には <code>pg_stat_statements</code> の併用が有効である。</li>
+  <li>再現実験では <span class="masked">基準計測→要因変更→再計測</span> の順序を守るべきである。</li>
+  <li>継続監視には <span class="masked">pg_stat_statements</span> の併用が有効である。</li>
 </ul>
 
 <h2>8. SQLドリルと解答例</h2>
@@ -916,12 +968,139 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
   </p>
 </div>
 
+<details>
+  <summary>追加演習の解答例（導き方 + サンプル）</summary>
+  <p>
+    追加演習は「1本の業務SQLを、同じ条件で前後比較できる形にする」ことが正解です。
+    まず現状計測を3回行って中央値を記録し、次に仮説に基づく変更を1つだけ適用して再計測します。
+    変更を同時に複数入れると、どれが効いたか説明できなくなるため避けてください。
+  </p>
+  <pre><code class="language-sql">
+-- 1) 現状計測（同じSQLを3回）
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, customer_id, amount
+FROM orders
+WHERE status = 'paid'
+  AND order_date &gt;= current_date - 30
+ORDER BY order_date DESC
+LIMIT 200;
+
+-- 2) 仮説: status + order_date の複合索引が有効
+CREATE INDEX IF NOT EXISTS idx_orders_paid_recent
+ON orders(status, order_date DESC)
+INCLUDE (amount, customer_id);
+ANALYZE orders;
+
+-- 3) 再計測
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, customer_id, amount
+FROM orders
+WHERE status = 'paid'
+  AND order_date &gt;= current_date - 30
+ORDER BY order_date DESC
+LIMIT 200;
+  </code></pre>
+  <p>
+    解答時は、<span class="highlight">Node Type</span>、<span class="highlight">actual rows</span>、
+    <span class="highlight">BUFFERS read/hit</span>、<span class="highlight">実行時間中央値</span>の4点を前後比較して説明してください。
+  </p>
+</details>
+
 <h3>定着確認（第8章）</h3>
 <ul>
-  <li>ドリルは <span class="masked">現状確認→対策→事後検証</span> の3段階で進める。</li>
-  <li>比較結果は <span class="masked">計画・実行時間・BUFFERS</span> をセットで記録する。</li>
-  <li>改善判断は <span class="masked">再現可能な比較結果</span> を根拠に行う。</li>
+  <li>ドリルは <span class="masked">現状確認→対策→事後検証</span> の3段階で進めるべきである。</li>
+  <li>比較結果は <span class="masked">計画・実行時間・BUFFERS</span> をセットで記録すべきである。</li>
+  <li>改善判断は <span class="masked">再現可能な比較結果</span> を根拠に行うべきである。</li>
 </ul>
+
+<h2>補助ハンズオン：create-x_db.sql を使った実行計画演習（任意）</h2>
+<p>
+本記事の主軸は <code>orders/customers</code> ですが、講義で使うゲームDBでも同じ分析手順を適用できます。
+以下は <code>from-teacher/10/create-x_db.sql</code> を前提にした、任意の補助ドリルです。
+</p>
+
+<div class="column">
+  <div class="column-title">ER図（create-x_db.sql）</div>
+  <p class="column-note">
+    参照先テーブルの関係を先に確認してから、JOIN計画と集計計画を読み解いてください。
+  </p>
+  <img src="../images/LER-01.png" alt="create-x_db.sql のER図" />
+</div>
+
+<div class="column">
+  <div class="column-title">準備コマンド</div>
+  <pre><code class="language-bash">
+# スキーマ再作成
+npm run sql from-teacher/10/create-x_db.sql
+
+# 必要なら検証用SQLファイルを開く
+code sql/tmp_ep_xdb.sql
+npm run sql sql/tmp_ep_xdb.sql
+  </code></pre>
+</div>
+
+<h3>補助ドリルA：ギルド所属JOINの計画を読む</h3>
+<p>
+目的は、<code>x_characters</code> と <code>x_guild_characters</code> のJOINで、
+入力行数に応じてどのノードが選ばれるかを観測することです。
+</p>
+<pre><code class="language-sql">
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT c.character_id, c.name, gc.guild_id
+FROM x_characters c
+JOIN x_guild_characters gc ON gc.character_id = c.character_id
+WHERE c.deleted_at IS NULL;
+</code></pre>
+<details>
+  <summary>解答例を見る</summary>
+  <pre><code class="language-sql">
+-- 期待する見方
+-- 1) Node Type（Nested Loop / Hash Join など）
+-- 2) rows と actual rows の差
+-- 3) BUFFERS read/hit
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT c.character_id, c.name, gc.guild_id
+FROM x_characters c
+JOIN x_guild_characters gc ON gc.character_id = c.character_id
+WHERE c.deleted_at IS NULL;
+  </code></pre>
+  <p>
+    行数が小さい初期状態では Nested Loop が選ばれやすく、件数増加時は Hash Join へ切り替わる可能性があります。
+    切替の有無は統計情報と件数分布で変わるため、実測で確認してください。
+  </p>
+</details>
+
+<h3>補助ドリルB：送金履歴の集計計画を読む</h3>
+<p>
+目的は、<code>x_gold_transfers</code> の集計で HashAggregate / GroupAggregate の違いを観測することです。
+</p>
+<pre><code class="language-sql">
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT to_character_id, COUNT(*) AS transfer_count, SUM(amount) AS total_amount
+FROM x_gold_transfers
+GROUP BY to_character_id
+ORDER BY transfer_count DESC;
+</code></pre>
+<details>
+  <summary>解答例を見る</summary>
+  <pre><code class="language-sql">
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT to_character_id, COUNT(*) AS transfer_count, SUM(amount) AS total_amount
+FROM x_gold_transfers
+GROUP BY to_character_id
+ORDER BY transfer_count DESC;
+
+-- 観察ポイント
+-- ・Groupノードの種類（HashAggregate / GroupAggregate）
+-- ・Sortノードの有無
+-- ・rows推定誤差と実行時間
+  </code></pre>
+  <p>
+    グループ数が少ない場合はHashAggregateが有利になりやすいですが、
+    メモリ設定や入力順序によってはGroupAggregateが選ばれることがあります。
+  </p>
+</details>
 
 <h2>9. まとめ</h2>
 <ul>
