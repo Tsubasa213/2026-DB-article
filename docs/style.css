@@ -15,7 +15,7 @@ html {
 }
 
 body.menu-open {
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* ===== ヘッダー ===== */
@@ -63,28 +63,30 @@ body.menu-open {
 .menu-btn span {
   display: block;
   position: absolute;
-  left: 8px;
-  width: 28px;
+  left: 50%;
+  top: 50%;
+  width: 26px;
   height: 2.5px;
   background-color: #333;
   border-radius: 4px;
-  transition: all 0.5s;
+  transform: translate(-50%, -50%);
+  transition: transform 0.35s ease, opacity 0.35s ease;
 }
 
 .menu-btn span:nth-child(1) {
-  top: 4px;
+  transform: translate(-50%, calc(-50% - 8px));
 }
 
 .menu-btn span:nth-child(2) {
-  top: 14px;
+  transform: translate(-50%, -50%);
 }
 
 .menu-btn span:nth-child(3) {
-  bottom: 4px;
+  transform: translate(-50%, calc(-50% + 8px));
 }
 
 body.menu-open .menu-btn span:nth-child(1) {
-  transform: translateY(10px) rotate(-315deg);
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 
 body.menu-open .menu-btn span:nth-child(2) {
@@ -92,33 +94,35 @@ body.menu-open .menu-btn span:nth-child(2) {
 }
 
 body.menu-open .menu-btn span:nth-child(3) {
-  transform: translateY(-10px) rotate(315deg);
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 /* ===== サイドメニュー ===== */
 #sideMenu {
   position: fixed;
   top: 0;
-  right: -240px;
+  right: 0;
   width: 220px;
   height: 100%;
   background: #f8f9fa;
-  padding: 24px 16px;
+  padding: 24px 16px 96px;
   border-left: 1px solid #ddd;
-  transition: right 0.25s ease;
+  transform: translateX(110%);
+  transition: transform 0.25s ease;
   z-index: 200;
   overflow-y: auto;
 }
 
 
 #sideMenu.open {
-  right: 0;
+  transform: translateX(0);
 }
 
 #sideMenu ul {
   list-style: none;
   padding: 0;
   margin: 0;
+  padding-bottom: max(36px, env(safe-area-inset-bottom));
 }
 
 #sideMenu li {
@@ -558,8 +562,7 @@ summary {
   }
 
   .menu-btn span {
-    left: 9px;
-    width: 30px;
+    width: 28px;
   }
 
   .docsbot-frame {
@@ -614,6 +617,124 @@ summary {
 }
 
 @media (max-width: 900px) {
+  body {
+    margin-left: 2.5%;
+    margin-right: 2.5%;
+  }
+
+  .content {
+    max-width: 100%;
+    width: 100%;
+    margin: 24px 0;
+    padding: 0 2.5%;
+  }
+
+  #sideMenu {
+    width: min(50vw, 420px);
+    right: 0;
+    padding: 24px 18px 120px;
+  }
+
+  #sideMenu li {
+    margin-bottom: 18px;
+  }
+
+  #sideMenu li.menu-level-h3 {
+    display: none;
+  }
+
+  #sideMenu li.menu-level-h2 a,
+  #sideMenu a {
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+
+  .menu-btn {
+    width: 56px;
+    height: 56px;
+    font-size: 1.9rem;
+    border-width: 2px;
+  }
+
+  .menu-btn span {
+    width: 32px;
+    height: 3px;
+  }
+
+  .docsbot-frame,
+  .docsbot-toggle-btn {
+    display: none !important;
+  }
+}
+
+@media (orientation: portrait) {
+  body {
+    margin-left: 2.5%;
+    margin-right: 2.5%;
+    font-size: 2rem;
+    line-height: 1.8;
+  }
+
+  .content {
+    max-width: 100%;
+    width: 100%;
+    margin: 24px 0;
+    padding: 0 2.5%;
+  }
+
+  h1 {
+    font-size: 2.6rem;
+  }
+
+  h2 {
+    font-size: 2.2rem;
+  }
+
+  h3 {
+    font-size: 1.9rem;
+  }
+
+  h4 {
+    font-size: 1.6rem;
+  }
+
+  .menu-btn {
+    width: 60px;
+    height: 60px;
+    font-size: 2.1rem;
+    border-width: 2px;
+    border-radius: 14px;
+  }
+
+  .menu-btn span {
+    width: 36px;
+    height: 3.5px;
+  }
+
+  .menu-btn span:nth-child(1) {
+    transform: translate(-50%, calc(-50% - 11px));
+  }
+
+  .menu-btn span:nth-child(3) {
+    transform: translate(-50%, calc(-50% + 11px));
+  }
+
+  #sideMenu {
+    width: min(50vw, 440px);
+    right: 0;
+    padding: 24px 18px 120px;
+  }
+
+  #sideMenu li.menu-level-h3 {
+    display: none;
+  }
+
+  #sideMenu li.menu-level-h2 a,
+  #sideMenu a {
+    font-size: 1.28rem;
+    font-weight: 700;
+  }
+
   .docsbot-frame,
   .docsbot-toggle-btn {
     display: none !important;

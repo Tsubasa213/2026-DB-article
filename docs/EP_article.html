@@ -841,7 +841,7 @@ LIMIT 200;
   </ul>
 </div>
 
-<h3>ex-01.sql：status条件の選択性差を比較し、実行計画の違いを説明してください。</h3>
+<h3>ex-01_1.sql：status条件の選択性差を比較し、実行計画の違いを説明してください。</h3>
 <p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
 <ol>
   <li>インデックス追加後、<code>status='paid'</code> と <code>status='canceled'</code> で、それぞれどの <code>Node Type</code> が選ばれましたか。</li>
@@ -895,7 +895,7 @@ SELECT * FROM orders WHERE status = 'canceled';
   </p>
 </details>
 
-<h3>ex-02.sql：複合インデックスの列順差を比較し、最適な列順を説明してください。</h3>
+<h3>ex-01_2.sql：複合インデックスの列順差を比較し、最適な列順を説明してください。</h3>
 <p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
 <ol>
   <li><code>idx_a(status, order_date)</code> と <code>idx_b(order_date, status)</code> のうち、対象SQLで実際に利用されやすかったのはどちらですか。</li>
@@ -953,7 +953,7 @@ WHERE status = 'paid'
   </p>
 </details>
 
-<h3>ex-03.sql：統計誤差を再現し、ANALYZEで推定精度を回復してください。</h3>
+<h3>ex-01_3.sql：統計誤差を再現し、ANALYZEで推定精度を回復してください。</h3>
 <p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
 <ol>
   <li><code>ANALYZE</code> 前後で <code>rows</code> と <code>actual rows</code> の差はどう変化しましたか。</li>
@@ -1009,7 +1009,7 @@ SELECT * FROM orders WHERE shipping_pref = 'tokyo';
   </p>
 </details>
 
-<h3>ex-04.sql：JOIN条件変更による <code>Hash Join</code> と <code>Nested Loop</code> の切替を比較してください。</h3>
+<h3>ex-01_4.sql：JOIN条件変更による <code>Hash Join</code> と <code>Nested Loop</code> の切替を比較してください。</h3>
 <p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
 <ol>
   <li>各ステップで選ばれたJOINノード（<code>Hash Join</code> / <code>Nested Loop</code>）を整理してください。</li>
@@ -1076,7 +1076,7 @@ GROUP BY c.segment;
   </p>
 </details>
 
-<h3>ex-05.sql：ORDER BY最適化のための索引を追加し、Sort有無を比較してください。</h3>
+<h3>ex-01_5.sql：ORDER BY最適化のための索引を追加し、Sort有無を比較してください。</h3>
 <p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
 <ol>
   <li>インデックス追加前後で <code>Sort</code> ノードの有無はどう変化しましたか。</li>
@@ -1137,7 +1137,7 @@ LIMIT 100;
   </p>
 </details>
 
-<h3>ex-06.sql：統計情報を古い状態にして計画悪化を再現し、改善差を比較してください。</h3>
+<h3>ex-01_6.sql：統計情報を古い状態にして計画悪化を再現し、改善差を比較してください。</h3>
 <p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
 <ol>
   <li>統計更新前後で <code>rows</code> 推定誤差はどの程度変化しましたか。</li>
@@ -1197,7 +1197,7 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
 </details>
 
 <div class="column">
-  <div class="column-title">追加演習：自分で作成したSQLを1本持ち込み、同じ手順で評価してみましょう</div>
+  <div class="column-title">ex-01_7.sql：追加演習：自分で作成したSQLを1本持ち込み、同じ手順で評価してみましょう</div>
   <p class="column-note">
     現在の計画、仮説、改善SQL、再測定結果を1セットで残してください。比較可能な記録があると再発防止に役立ちます。
   </p>
@@ -1282,7 +1282,7 @@ npm run sql sql/tmp_ep_xdb.sql
   </code></pre>
 </div>
 
-<h3>EXドリル01：ギルド所属JOINの計画を読む</h3>
+<h3>ex-02_1.sql：ギルド所属JOINの計画を読む</h3>
 <p>
 目的は、<code>x_characters</code> と <code>x_guild_characters</code> のJOINで、
 入力行数に応じてどのノードが選ばれるかを観測することです。
@@ -1326,7 +1326,7 @@ WHERE c.deleted_at IS NULL;
   </p>
 </details>
 
-<h3>EXドリル02：送金履歴の集計計画を読む</h3>
+<h3>ex-02_2.sql：送金履歴の集計計画を読む</h3>
 <p>
 目的は、<code>x_gold_transfers</code> の集計で HashAggregate / GroupAggregate の違いを観測することです。
 </p>

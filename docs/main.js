@@ -102,14 +102,27 @@ document.addEventListener("DOMContentLoaded", () => {
     updateMenuButton();
   });
 
+  const closeMenu = () => {
+    isOpen = false;
+    menu.classList.remove("open");
+    document.body.classList.remove("menu-open");
+    updateMenuButton();
+  };
+
   // メニュー内リンククリック時に閉じる
   menu.addEventListener("click", (event) => {
     if (event.target instanceof HTMLAnchorElement) {
-      isOpen = false;
-      menu.classList.remove("open");
-      document.body.classList.remove("menu-open");
-      updateMenuButton();
+      closeMenu();
     }
+  });
+
+  // メニュー外をタップ/クリックしたら閉じる
+  document.addEventListener("click", (event) => {
+    if (!isOpen) return;
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    if (menu.contains(target) || menuBtn.contains(target)) return;
+    closeMenu();
   });
 
   // 穴埋めの表示切り替え
