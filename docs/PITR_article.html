@@ -57,7 +57,9 @@ PITRの前に、基本のバックアップ/リストアを整理します。こ
 <h4>バックアップの種類</h4>
 <p>
 バックアップには大きく<strong>論理バックアップ</strong>と<strong>物理バックアップ</strong>があります。
-PITRはベースバックアップとWAL（Write-Ahead Logging）の組み合わせが前提です。
+ここでいう <span class="highlight">WAL（Write-Ahead Logging）</span> とは、
+「データ本体を書き換える前に、変更内容を先に記録しておく更新ログ」のことです。
+PITRはベースバックアップとこのWALの組み合わせが前提です。
 そのため、論理だけでなく物理バックアップの特徴も把握しておく必要があります。
 </p>
 <ul>
@@ -87,6 +89,16 @@ pg_dump -d mydb -F c -f backup.dump
   <p>
     「テーブル単位で戻したいケース」と「障害直後に全体を早く戻したいケース」をそれぞれ想定し、
     どちらの方式を選ぶか理由つきで説明してみてください。
+  </p>
+</details>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    テーブル単位で戻したい場合は <code>論理バックアップ（pg_dump / pg_restore）</code> を選びます。<br>
+    理由は、復元対象をスキーマ/テーブル単位で柔軟に絞れるためです。<br>
+    障害直後に全体を早く戻したい場合は <code>物理バックアップ（pg_basebackup）+ WAL</code> を選びます。<br>
+    理由は、DB全体を時点指定で高速に復旧でき、RTO短縮に有利だからです。
   </p>
 </details>
 
@@ -136,7 +148,8 @@ SELECT COUNT(*) FROM orders;
 
 <h4>バックアップの保存戦略</h4>
 <p>
-バックアップを1世代だけ保持すると「壊れたバックアップ」しか残らない可能性があります。
+バックアップを「最新1回分（1世代）」しか保持しないと、
+その1つが壊れていた場合に正常なバックアップが1つも残らない可能性があります。
 世代管理と保管先の分離でリスクを下げてください。
 </p>
 <ul>
@@ -302,7 +315,7 @@ PITRは時刻以外にも停止位置を指定できます。
 </p>
 <ul>
   <li><code>recovery_target_time</code>：時刻指定。直感的</li>
-  <li><code>recovery_target_lsn</code>：LSN指定。より厳密</li>
+  <li><code>recovery_target_lsn</code>：LSN（Log Sequence Number、WAL上の位置）指定。より厳密</li>
   <li><code>recovery_target_name</code>：リカバリーポイント名指定</li>
 </ul>
 <div class="column">
@@ -621,6 +634,19 @@ wal_level = replica
     どこで失敗しているかを1つずつ切り分けてください。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <ol>
+    <li><strong>パス確認</strong>：アーカイブ先ディレクトリの存在とスペルを確認します（例：<code>/backup/wal_archive</code>）。</li>
+    <li><strong>権限確認</strong>：PostgreSQL実行ユーザーが書き込み可能かを確認します。</li>
+    <li><strong>衝突確認</strong>：同名WALが既にある場合の挙動を確認し、<code>test ! -f</code> 条件で意図通りか検証します。</li>
+    <li><strong>ログ確認</strong>：<code>docker logs db-postgres</code> で失敗メッセージを確認し、再発防止の設定修正まで行います。</li>
+  </ol>
+  <p>
+    この順序で切り分けると、設定ミス・権限ミス・運用ミスを最短で判別できます。
+  </p>
+</details>
 <div class="column">
   <div class="column-title">失敗時の観察ポイント（4.2で実施）</div>
   <p class="column-note">
@@ -723,7 +749,7 @@ touch recovery.signal
 </code></pre>
 <p>
 Docker環境では <span class="highlight">/var/lib/postgresql/data</span> に作成します。例：
-<span class="highlight">docker exec -it db-postgres bash -c "touch /var/lib/postgresql/data/recovery.signal"</span>
+<span class="highlight"><code>docker exec -it db-postgres bash -c "touch /var/lib/postgresql/data/recovery.signal"</code></span>
 </p>
 <p>
 このコマンドは <span class="highlight">コンテナが起動している状態</span>で実行する必要があります。
@@ -1050,7 +1076,7 @@ FROM x_gold_transfers;
   <li>リカバリを開始するには、データディレクトリ内に <span class="masked">recovery.signal</span> という空ファイルを作成します。</li>
   <li>復旧を止めたい特定の時刻は <span class="masked">recovery_target_time</span> パラメータで指定します。</li>
   <li>リカバリ終了直後、DBは「一時停止」状態になるため、<span class="masked">pg_wal_replay_resume()</span> を実行して通常稼働へ移行させる必要があります。</li>
-  <li>物理的な破壊（DROP TABLEなど）は、通常の <span class="masked">ROLLBACK</span> では救済できないため、PITRが有効です。</li>
+  <li>物理的な破壊（<code>DROP TABLE</code>など）は、通常の <span class="masked">ROLLBACK</span> では救済できないため、PITRが有効です。</li>
 </ul>
 
 <div class="column">
@@ -1062,7 +1088,7 @@ FROM x_gold_transfers;
 </div>
 
 
-<p class="footer-text"><span class="highlight">制作時間：22時間</span></p>
+<p class="footer-text"><span class="highlight">制作時間：28時間</span></p>
 <footer class="footer">
   <a class="footer-link" href="https://github.com/Tsubasa213" target="_blank" rel="noopener noreferrer">GitHub</a>
   <p class="footer-text">© copyright 2026 Tsubasa213/つばさ all right resolved.</p>

@@ -18,11 +18,11 @@
 
 <h2>1. はじめに</h2>
 <p>
-本記事では、PostgreSQL 17 環境において EXPLAIN ANALYZE を用い、
+本記事では、PostgreSQL 17 環境において <code>EXPLAIN ANALYZE</code> を用い、
 クエリ実行計画と実行性能の関係を検証します。
 </p>
 <p>
-対象読者は、SQLの基本文法（SELECT / JOIN / GROUP BY）を理解しており、
+対象読者は、SQLの基本文法（<code>SELECT</code> / <code>JOIN</code> / <code>GROUP BY</code>）を理解しており、
 「同じ結果を返すSQLでも、なぜ速度差が出るのか」を説明できるようになりたい方です。
 </p>
 <p>
@@ -33,8 +33,8 @@
 <div class="column">
   <div class="column-title">この記事で身につくこと</div>
   <ul class="column-note">
-    <li>Scan種別（Seq Scan / Index Scan / Bitmap Heap Scan）の違いを説明できます。</li>
-    <li>推定行数（rows）と実測行数（actual rows）の差から、計画の妥当性を判断できます。</li>
+    <li>Scan種別（<code>Seq Scan</code> / <code>Index Scan</code> / <code>Bitmap Heap Scan</code>）の違いを説明できます。</li>
+    <li>推定行数（<code>rows</code>）と実測行数（<code>actual rows</code>）の差から、計画の妥当性を判断できます。</li>
     <li>改善手段（インデックス・SQL書き換え・統計更新）を、根拠つきで選べます。</li>
   </ul>
 </div>
@@ -42,10 +42,19 @@
 <div class="column">
   <div class="column-title">ウォームアップ演習：実行計画を読むとき最初に見る項目は何ですか？</div>
   <p class="column-note">
-    最初は Node Type、rows（推定）、actual rows（実測）、loops を見るのがおすすめです。
+    最初は <code>Node Type</code>、<code>rows</code>（推定）、<code>actual rows</code>（実測）、<code>loops</code> を見るのがおすすめです。
     この4点で「何を、どれくらい、何回処理したか」を把握しやすくなります。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    最初に確認する項目は <code>Node Type</code>、<code>rows</code>、<code>actual rows</code>、<code>loops</code> です。<br>
+    まず処理方式（Scan/Joinの種類）を把握し、次に推定と実測の差を見て、最後に繰り返し回数を確認すると、
+    「どの処理がボトルネックか」を短時間で特定できます。
+  </p>
+</details>
 
 <h2>2. 実験環境</h2>
 <ul>
@@ -112,21 +121,30 @@ ANALYZE orders;
 <div class="column">
   <div class="column-title">演習：データ件数を半分にすると計画はどう変わりますか？</div>
   <p class="column-note">
-    100万件と50万件で同じSQLを比較してみてください。件数が減ると Seq Scan の優位性が変わる場面があります。
+    100万件と50万件で同じSQLを比較してみてください。件数が減ると <code>Seq Scan</code> の優位性が変わる場面があります。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    件数を半分にすると、同じ条件でも <code>Seq Scan</code> から <code>Index Scan</code> / <code>Bitmap Heap Scan</code> へ切り替わる可能性があります。<br>
+    理由は、対象行割合が相対的に小さく見積もられ、ランダムアクセスの不利が小さくなるためです。<br>
+    比較時は <code>Node Type</code> だけでなく、<code>actual time</code> と <code>BUFFERS(read/hit)</code> を同時に確認してください。
+  </p>
+</details>
 
 <h3>2.3 測定時の注意</h3>
 <ul>
   <li>初回実行の結果を確認し、ディスクI/O影響（キャッシュ未温）を切り分けます。</li>
   <li>同じSQLを複数回実行し、中央値を比較します。</li>
-  <li>EXPLAIN だけで終えず、EXPLAIN ANALYZE で実測を確認します。</li>
+  <li><code>EXPLAIN</code> だけで終えず、<code>EXPLAIN ANALYZE</code> で実測を確認します。</li>
 </ul>
 
 <div class="column">
-  <div class="column-title">補足：本番でEXPLAIN ANALYZEを使うとき</div>
+  <div class="column-title">補足：本番で<code>EXPLAIN ANALYZE</code>を使うとき</div>
   <p class="column-note">
-    EXPLAIN ANALYZE は実際にクエリを実行します。更新系SQLでは影響が出るため、<span class="critical-text">検証環境で再現して確認することは必須</span>です。
+    <code>EXPLAIN ANALYZE</code> は実際にクエリを実行します。更新系SQLでは影響が出るため、<span class="critical-text">検証環境で再現して確認することは必須</span>です。
   </p>
 </div>
 
@@ -140,35 +158,37 @@ ANALYZE orders;
 
 <h3>定着確認（第2章）</h3>
 <ul>
-  <li>性能確認では <span class="masked">EXPLAIN ANALYZE</span> で実測を取るべきである。</li>
+  <li>性能確認では <span class="masked"><code>EXPLAIN ANALYZE</code></span> で実測を取るべきである。</li>
   <li>更新系SQLの検証は <span class="masked">本番ではなく検証環境</span> で行うべきである。</li>
   <li>比較時は <span class="masked">同一SQLを複数回実行</span> し、中央値で判断すべきである。</li>
 </ul>
 
 <h2>3. EXPLAIN / ANALYZE の基本</h2>
 <p>
-EXPLAIN は「実行前の見込み計画」、EXPLAIN ANALYZE は「実際に実行した結果付き計画」です。
+<code>EXPLAIN</code> は「実行前の見込み計画」、<code>EXPLAIN ANALYZE</code> は「実際に実行した結果付き計画」です。
 チューニングでは、まず見込みと実測の差を確認します。
 </p>
 
 <h3>3.1 まず読むべき項目</h3>
 <ul>
-  <li><span class="highlight">Node Type</span>：Seq Scan / Index Scan / Hash Join など</li>
-  <li><span class="highlight">cost</span>：プランナが比較に使う相対値</li>
-  <li><span class="highlight">rows</span>：推定行数</li>
-  <li><span class="highlight">actual rows</span>：実際の処理行数</li>
-  <li><span class="highlight">loops</span>：ノードが繰り返された回数</li>
+  <li><span class="highlight"><code>Node Type</code></span>：<code>Seq Scan</code> / <code>Index Scan</code> / <code>Hash Join</code> など</li>
+  <li><span class="highlight"><code>cost</code></span>：プランナ（最適計画を選ぶ機構）が比較に使う相対値</li>
+  <li><span class="highlight"><code>rows</code></span>：推定行数</li>
+  <li><span class="highlight"><code>actual rows</code></span>：実際の処理行数</li>
+  <li><span class="highlight"><code>loops</code></span>：ノードが繰り返された回数</li>
 </ul>
 <p>
-ここで最も誤解しやすい点は、<span class="highlight">actual rows は1ループあたりの平均行数</span>として表示される場合があることです。
-そのため、実際の総処理行数は <span class="highlight">actual rows × loops</span> で読み取るのが基本です。
+ここで最も誤解しやすい点は、<span class="highlight"><code>actual rows</code> は1ループあたりの平均行数</span>として表示される場合があることです。
+そのため、実際の総処理行数は <span class="highlight"><code>actual rows × loops</code></span> で読み取るのが基本です。
 たとえば <code>actual rows=120</code>、<code>loops=50</code> なら、合計では約6,000行を処理したと解釈できます。
 </p>
 
 <h3>3.2 単純フィルタ</h3>
 <p>
-まず説明を先に確認します。プランナは「該当行が全体の何割か」を統計情報から推定し、
-ランダムI/O中心になるIndexアクセスと、順次読み取り中心になるSeq Scanを比較します。
+まず説明を先に確認します。ここでいう<span class="highlight">プランナ</span>とは、
+「どの実行計画が最も低コストかを見積もって選択するPostgreSQL内部の最適化機構」です。
+プランナは「該当行が全体の何割か」を統計情報から推定し、
+ランダムI/O中心になる<code>Index Scan</code>系アクセスと、順次読み取り中心になる<code>Seq Scan</code>を比較します。
 </p>
 <pre><code class="language-sql">
 EXPLAIN (ANALYZE, BUFFERS)
@@ -177,13 +197,13 @@ FROM orders
 WHERE status = 'paid';
 </code></pre>
 <p>
-status列にインデックスがない場合、通常は Seq Scan が選ばれます。全件を確認して条件を満たす行だけ返すため、
+<code>status</code> 列にインデックスがない場合、通常は <code>Seq Scan</code> が選ばれます。全件を確認して条件を満たす行だけ返すため、
 行数が増えるほど時間は増加しやすくなります。
 </p>
 <p>
 具体例として、100万件中25万件（25%）が <code>status='paid'</code> に該当する分布では、
-インデックスがあっても「大量ヒット + テーブル参照」のコストが高くなり、Seq Scanが有利になりやすいです。
-一方で1万件（1%）程度しかヒットしない条件なら、Index ScanやBitmap Heap Scanが選ばれやすくなります。
+インデックスがあっても「大量ヒット + テーブル参照」のコストが高くなり、<code>Seq Scan</code>が有利になりやすいです。
+一方で1万件（1%）程度しかヒットしない条件なら、<code>Index Scan</code>や<code>Bitmap Heap Scan</code>が選ばれやすくなります。
 </p>
 
 <div class="column">
@@ -192,23 +212,36 @@ status列にインデックスがない場合、通常は Seq Scan が選ばれ�
     一律の閾値はありませんが、10倍以上の差が続く場合は統計不足や相関の見落としを疑うとよいです。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    目安として、単発で2〜3倍の差は発生し得ますが、<code>10倍以上</code>の乖離が継続する場合は要注意です。<br>
+    このときは <code>ANALYZE</code> 実施状況、<code>pg_stats</code> の分布、列相関（必要なら <code>extended statistics</code>）を順に確認します。<br>
+    改善後に再度 <code>rows</code> と <code>actual rows</code> を比較し、乖離縮小をもって対策有効と判断します。
+  </p>
+</details>
 
 <h3>3.3 典型ノードの意味</h3>
+<p>
+この節では、実行計画で頻出するノード名の役割を整理します。
+ノード名ごとの「向いている条件」を先に把握しておくと、計画を見たときに改善方針を立てやすくなります。
+</p>
 <ul>
-  <li>Seq Scan：テーブル全体走査。広い条件や低選択性条件で選ばれやすい</li>
-  <li>Index Scan：インデックスを辿って該当行へアクセス</li>
-  <li>Bitmap Heap Scan：多数ヒット時に、先にビットマップで集めてから読み込む</li>
-  <li>Nested Loop：外側行ごとに内側を探す。小さい集合同士で強い</li>
-  <li>Hash Join：片側をハッシュ化して突き合わせる。中〜大規模で有効</li>
+  <li><code>Seq Scan</code>：テーブル全体走査。広い条件や低選択性条件で選ばれやすい</li>
+  <li><code>Index Scan</code>：インデックスを辿って該当行へアクセス</li>
+  <li><code>Bitmap Heap Scan</code>：多数ヒット時に、先にビットマップで集めてから読み込む</li>
+  <li><code>Nested Loop</code>：外側行ごとに内側を探す。小さい集合同士で強い</li>
+  <li><code>Hash Join</code>：片側をハッシュ化して突き合わせる。中〜大規模で有効</li>
 </ul>
 
 <h3>3.4 costの解釈</h3>
 <p>
-cost は時間（ms）そのものではなく、プランナ内部の評価値です。したがって cost が半分でも、実行時間が半分になるとは限りません。
+<code>cost</code> は時間（ms）そのものではなく、プランナ内部の評価値です。したがって <code>cost</code> が半分でも、実行時間が半分になるとは限りません。
 ただし同一環境・同一時点で候補プランを比べる指標としては有効です。
 </p>
 <p>
-cost には主に <code>seq_page_cost</code> と <code>random_page_cost</code>、CPU演算の重みが反映されます。
+<code>cost</code> には主に <code>seq_page_cost</code> と <code>random_page_cost</code>、CPU演算の重みが反映されます。
 つまり、同じデータ件数でも「連続読み取り中心か」「ランダム読み取り中心か」で評価が大きく変わります。
 実行時間との差分は、キャッシュ状態・同時実行・ストレージ性能の影響で発生するため、
 最終判断は必ず <code>EXPLAIN (ANALYZE, BUFFERS)</code> の実測で行う必要があります。
@@ -227,7 +260,7 @@ WHERE o.status = 'paid'
   AND o.order_date &gt;= current_date - 30;
 </code></pre>
 <p>
-最初に <span class="highlight">Node Type</span>、<span class="highlight">actual rows</span>、<span class="highlight">loops</span> を確認してください。
+最初に <span class="highlight"><code>Node Type</code></span>、<span class="highlight"><code>actual rows</code></span>、<span class="highlight"><code>loops</code></span> を確認してください。
 この段階で「どの処理が何回実行されているか」を把握できます。
 </p>
 <pre><code class="language-text">
@@ -236,8 +269,8 @@ Limit  (actual time=12.4..12.9 rows=200 loops=1)
       (actual time=12.3..12.8 rows=200 loops=1)
 </code></pre>
 <p>
-上のように <span class="highlight">Index Scan</span> へ切り替わっているか、
-<span class="highlight">actual time</span> が改善しているかを見てください。
+上のように <span class="highlight"><code>Index Scan</code></span> へ切り替わっているか、
+<span class="highlight"><code>actual time</code></span> が改善しているかを見てください。
 </p>
 
 <pre><code class="language-sql">
@@ -278,7 +311,7 @@ WHERE relname IN ('orders', 'customers');
 <div class="column">
   <div class="column-title">テンプレート運用のコツ</div>
   <p class="column-note">
-    取得した結果は、<span class="highlight">rows推定誤差</span>、<span class="highlight">buffers read/hit</span>、<span class="highlight">利用インデックス</span>の3軸で並べて比較してください。
+    取得した結果は、<span class="highlight"><code>rows</code>推定誤差</span>、<span class="highlight"><code>buffers read/hit</code></span>、<span class="highlight">利用インデックス</span>の3軸で並べて比較してください。
   </p>
 </div>
 
@@ -300,21 +333,35 @@ Buffers: shared hit=1200 read=18450
 <div class="column">
   <div class="column-title">演習：同じSQLを3回実行したとき、どの値を比較しますか？</div>
   <p class="column-note">
-    実行時間だけでなく、buffers の read/hit、actual rows、loops も合わせて比較してください。
+    実行時間だけでなく、<code>buffers</code> の <code>read/hit</code>、<code>actual rows</code>、<code>loops</code> も合わせて比較してください。
     ばらつきが小さい条件で比較することが重要です。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    比較すべき値は、<code>実行時間中央値</code>、<code>BUFFERS read/hit</code>、<code>actual rows</code>、<code>loops</code> の4点です。<br>
+    1回目はキャッシュ未温で遅くなることがあるため、2〜3回目を含めて中央値で判断します。<br>
+    実行時間だけでなく read/hit の変化を見ることで、遅延要因がI/OかCPUかを切り分けられます。
+  </p>
+</details>
 
 <h3>定着確認（第3章）</h3>
 <ul>
-  <li>実行計画の初見では <span class="masked">Node Type / rows / actual rows / loops</span> を優先確認すべきである。</li>
+  <li>実行計画の初見では <span class="masked"><code>Node Type / rows / actual rows / loops</code></span> を優先確認すべきである。</li>
   <li><code>cost</code> は <span class="masked">相対評価値</span> であり、実時間と一致しない前提で扱うべきである。</li>
-  <li>原因切り分けでは <span class="masked">buffers read/hit</span> を実行時間と併せて確認すべきである。</li>
+  <li>原因切り分けでは <span class="masked"><code>buffers read/hit</code></span> を実行時間と併せて確認すべきである。</li>
 </ul>
 
 <h2>4. データ量と実行計画の変化</h2>
 <p>
 同一SQLでも、データ量が増えるとプランナが採用する計画は変化します。ここでは件数を増やしながら比較します。
+</p>
+<p>
+プランナは、統計情報を使って候補計画の <code>cost</code> を見積もり、
+もっとも有利と判断した実行計画を選択します。
+そのため、同じSQLでもデータ件数や分布が変わると、<code>Node Type</code> が切り替わることがあります。
 </p>
 
 <h3>4.1 小規模データ・1万件</h3>
@@ -325,13 +372,13 @@ FROM orders
 WHERE order_date &gt;= date '2025-01-01';
 </code></pre>
 <p>
-対象が多い場合、インデックスがあっても Seq Scan が勝つことがあります。ランダムアクセスのオーバーヘッドより、
+対象が多い場合、インデックスがあっても <code>Seq Scan</code> が勝つことがあります。ランダムアクセスのオーバーヘッドより、
 連続読み込みの方が速くなるためです。
 </p>
 
 <h3>4.2 中規模データ・100万件</h3>
 <p>
-order_date の選択性が高い条件（例えば直近7日）に変更すると、Index Scan または Bitmap Heap Scan に切り替わりやすくなります。
+<code>order_date</code> の選択性が高い条件（例えば直近7日）に変更すると、<code>Index Scan</code> または <code>Bitmap Heap Scan</code> に切り替わりやすくなります。
 </p>
 <pre><code class="language-sql">
 EXPLAIN (ANALYZE, BUFFERS)
@@ -345,20 +392,20 @@ Bitmap Heap Scan on orders  (actual time=8.221..35.744 rows=5120 loops=1)
   Buffers: shared hit=980 read=120
 </code></pre>
 <p>
-注目点は <span class="highlight">Node Type</span> と <span class="highlight">rows</span>、
-そして <span class="highlight">Buffers</span> の read/hit 比率です。これらを前回結果と比較してください。
+注目点は <span class="highlight"><code>Node Type</code></span> と <span class="highlight"><code>rows</code></span>、
+そして <span class="highlight"><code>Buffers</code></span> の <code>read/hit</code> 比率です。これらを前回結果と比較してください。
 </p>
 <p>
-例えば、100万件中「直近7日」が約5,000件（0.5%）なら、該当ページだけを効率よく拾えるIndex系ノードが有利です。
-逆に20万件以上が該当する条件では、ページを広範囲に読む必要があるためSeq Scanへ戻る可能性が高くなります。
+例えば、100万件中「直近7日」が約5,000件（0.5%）なら、該当ページだけを効率よく拾える<code>Index</code>系ノードが有利です。
+逆に20万件以上が該当する条件では、ページを広範囲に読む必要があるため<code>Seq Scan</code>へ戻る可能性が高くなります。
 この切替点は統計情報とテーブル分布に依存するため、実データでの観測が不可欠です。
 </p>
 
 <h3>4.3 大規模データでの集計</h3>
 <p>
 集計は「入力をどう並べるか」「中間結果をどこに保持するか」で計画が変わります。
-都道府県のようにグループ数が少ない列では、HashAggregateでメモリ内集計できると速くなる傾向があります。
-一方、入力が既に整列済み、またはSortコストが低い場合はGroupAggregateが選ばれることがあります。
+都道府県のようにグループ数が少ない列では、<code>HashAggregate</code>でメモリ内集計できると速くなる傾向があります。
+一方、入力が既に整列済み、または<code>Sort</code>コストが低い場合は<code>GroupAggregate</code>が選ばれることがあります。
 </p>
 <pre><code class="language-sql">
 EXPLAIN (ANALYZE, BUFFERS)
@@ -367,7 +414,7 @@ FROM orders
 GROUP BY shipping_pref;
 </code></pre>
 <p>
-GroupAggregate と HashAggregate のどちらが出るかは、並び順やメモリ設定、推定行数に依存します。
+<code>GroupAggregate</code> と <code>HashAggregate</code> のどちらが出るかは、並び順やメモリ設定、推定行数に依存します。
 </p>
 <p>
 具体例として、<code>shipping_pref</code> が5種類に偏る分布なら、100万件入力でもハッシュ表は小さく保てます。
@@ -378,19 +425,28 @@ GroupAggregate と HashAggregate のどちらが出るかは、並び順やメ�
 <div class="column">
   <div class="column-title">観察ポイント</div>
   <p class="column-note">
-    実行時間だけで判断しないことが重要です。Node構成、rows推定誤差、buffersのread/hitを同時に見て「なぜ遅いか」を説明してください。
+    実行時間だけで判断しないことが重要です。<code>Node</code>構成、<code>rows</code>推定誤差、<code>buffers</code>の<code>read/hit</code>を同時に見て「なぜ遅いか」を説明してください。
   </p>
 </div>
 
 <div class="column">
-  <div class="column-title">演習：件数が増えると、どのタイミングでNode Typeが切り替わりますか？</div>
+  <div class="column-title">演習：件数が増えると、どのタイミングで<code>Node Type</code>が切り替わりますか？</div>
   <p class="column-note">
     10万件・50万件・100万件の順に同じSQLを実行し、
-    <span class="highlight">どの件数で Seq Scan から Index系ノードへ切り替わったか</span>を確認してください。
-    あわせて rows と actual rows の差、実行時間、BUFFERS(read/hit) を表にして比較すると、
+    <span class="highlight">どの件数で <code>Seq Scan</code> から <code>Index</code>系ノードへ切り替わったか</span>を確認してください。
+    あわせて <code>rows</code> と <code>actual rows</code> の差、実行時間、<code>BUFFERS(read/hit)</code> を表にして比較すると、
     「なぜその計画が選ばれたか」を説明しやすくなります。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    切替タイミングは固定値ではなく、<code>選択性</code>と<code>分布</code>で決まります。<br>
+    一般に、対象割合が高い間は <code>Seq Scan</code> が優位で、対象割合が十分低くなると <code>Index Scan</code> / <code>Bitmap Heap Scan</code> へ切り替わります。<br>
+    実務では「どの件数で切り替わったか」だけでなく、同時に <code>rows誤差</code> と <code>BUFFERS(read/hit)</code> も記録して判断します。
+  </p>
+</details>
 
 <h3>定着確認（第4章）</h3>
 <ul>
@@ -459,13 +515,13 @@ ON orders(order_date)
 INCLUDE (amount, status);
 </code></pre>
 <p>
-必要列がインデックス内で完結すると Index Only Scan が選択され、テーブル参照を減らせる場合があります。
+必要列がインデックス内で完結すると <code>Index Only Scan</code> が選択され、テーブル参照を減らせる場合があります。
 </p>
 
 <h3>5.4 不要インデックスの副作用</h3>
 <ul>
-  <li>INSERT / UPDATE / DELETE が遅くなる</li>
-  <li>VACUUM やメンテナンスの負荷が上がる</li>
+  <li><code>INSERT / UPDATE / DELETE</code> が遅くなる</li>
+  <li><code>VACUUM</code> やメンテナンスの負荷が上がる</li>
   <li>ストレージを圧迫する</li>
 </ul>
 
@@ -487,11 +543,20 @@ WHERE status = 'canceled';
     低頻度で、かつ業務上よく検索する条件に向いています。運用前に更新コストも含めて評価してください。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    部分インデックスは「<code>該当行が少ない</code>」「<code>検索頻度が高い</code>」「<code>条件が固定的</code>」の3条件が揃うと有効です。<br>
+    例として <code>status='canceled'</code> のような低頻度条件は採用候補になります。<br>
+    追加前後で <code>EXPLAIN (ANALYZE, BUFFERS)</code> を比較し、更新系コスト増と見合うかで最終判断してください。
+  </p>
+</details>
 
 <div class="column">
   <div class="column-title">演習：複合インデックスの列順を逆にしたときの差を観測してください</div>
   <p class="column-note">
-    実行時間だけでなく、Node Type・loops・buffers の差を比較して、どちらが目的クエリに適しているか説明してみてください。
+    実行時間だけでなく、<code>Node Type</code>・<code>loops</code>・<code>buffers</code> の差を比較して、どちらが目的クエリに適しているか説明してみてください。
   </p>
 </div>
 
@@ -504,14 +569,14 @@ WHERE status = 'canceled';
 
 <h2>6. 統計情報と推定誤差</h2>
 <p>
-プランナは統計情報を使って rows を推定します。推定が外れると、計画選択も外れます。
+プランナは統計情報を使って <code>rows</code> を推定します。推定が外れると、計画選択も外れます。
 </p>
 
 <h3>6.1 どこを見るか</h3>
 <ul>
-  <li>EXPLAIN の rows と actual rows の比率</li>
+  <li><code>EXPLAIN</code> の <code>rows</code> と <code>actual rows</code> の比率</li>
   <li><code>pg_stats</code> の n_distinct / most_common_vals</li>
-  <li>ANALYZE 実行タイミング</li>
+  <li><code>ANALYZE</code> 実行タイミング</li>
 </ul>
 
 <h3>6.2 推定誤差の再現</h3>
@@ -570,6 +635,15 @@ ANALYZE orders;
     WHERE句やJOIN条件で使う列を優先して確認します。<code>pg_stats</code> の most_common_vals や n_distinct が参考になります。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    優先して確認する列は、<code>WHERE</code> 条件列、<code>JOIN</code> キー、<code>GROUP BY</code> / <code>ORDER BY</code> 列です。<br>
+    指標は <code>n_distinct</code>、<code>most_common_vals</code>、<code>most_common_freqs</code> を中心に見ます。<br>
+    ANALYZE後に <code>rows</code> と <code>actual rows</code> の乖離が縮んでいれば、統計更新が有効だったと判断できます。
+  </p>
+</details>
 
 <div class="column">
   <div class="column-title">演習：extended statistics が有効なケースを挙げてください</div>
@@ -604,13 +678,13 @@ WHERE order_date &gt;= current_date - 30;
 <h3>7.2 パラメータ値による差</h3>
 <p>
 同じSQLテンプレートでも、値の偏りにより最適計画が変わります。prepared statement 運用では、
-generic plan / custom plan の挙動にも注意します。
+<code>generic plan / custom plan</code> の挙動にも注意します。
 </p>
 
 <h3>7.3 JOINでの落とし穴</h3>
 <p>
 JOINでは、外側入力の行数推定が少し外れるだけで最適解が変わることがあります。
-特に、Nested Loopは「外側が小さい」前提で高速化されるため、
+特に、<code>Nested Loop</code>は「外側が小さい」前提で高速化されるため、
 推定が過小だと内側探索が想定回数を超え、急激に遅くなる場合があります。
 </p>
 <pre><code class="language-sql">
@@ -622,11 +696,11 @@ WHERE o.order_date &gt;= date '2025-01-01'
 GROUP BY c.prefecture;
 </code></pre>
 <p>
-Hash Join と Nested Loop の選択は、外側行数推定に強く依存します。rows 誤差が大きいと不利なJOIN方式を選ぶ可能性があります。
+<code>Hash Join</code> と <code>Nested Loop</code> の選択は、外側行数推定に強く依存します。<code>rows</code> 誤差が大きいと不利なJOIN方式を選ぶ可能性があります。
 </p>
 <p>
 例えば、実際には20万件がJOIN対象なのに2万件と推定された場合、
-Nested Loopが選ばれて内側アクセスが過剰に発生することがあります。
+<code>Nested Loop</code>が選ばれて内側アクセスが過剰に発生することがあります。
 このようなケースでは、統計更新や条件見直しで推定精度を上げることが、
 単純なインデックス追加より有効な対策になることがあります。
 </p>
@@ -634,9 +708,9 @@ Nested Loopが選ばれて内側アクセスが過剰に発生することがあ
 <h3>7.4 計画比較の型を作る</h3>
 <ul>
   <li>同一SQLを3回実行し、中央値を比較します。</li>
-  <li>ANALYZE前後で rows 誤差を比較します。</li>
-  <li>インデックス追加前後で Node構成を比較します。</li>
-  <li>BUFFERS read/hit の変化を記録し、要因を切り分けます。</li>
+  <li><code>ANALYZE</code>前後で <code>rows</code> 誤差を比較します。</li>
+  <li>インデックス追加前後で <code>Node</code>構成を比較します。</li>
+  <li><code>BUFFERS read/hit</code> の変化を記録し、要因を切り分けます。</li>
 </ul>
 
 <h3>7.5 インデックスがあるのに遅いケースを再現する</h3>
@@ -708,6 +782,15 @@ LIMIT 200;
     BUFFERSのread/hit、同時実行状況、実行タイミング（バッチ時間帯）を優先的に確認してください。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    まず <code>BUFFERS(read/hit)</code> を見て、I/O待ち増加かキャッシュ未温かを切り分けます。<br>
+    次に同時実行数（バッチ重複・ロック待ち）を確認し、最後に時間帯差（負荷ピーク）を確認します。<br>
+    計画が同じでも、実行環境の負荷条件が違えば実行時間は大きく変わります。
+  </p>
+</details>
 
 <p>
 ここまでで「計画の読み方」と「乖離の原因切り分け」を確認できました。
@@ -926,7 +1009,7 @@ SELECT * FROM orders WHERE shipping_pref = 'tokyo';
   </p>
 </details>
 
-<h3>ex-04.sql：JOIN条件変更による Hash Join と Nested Loop の切替を比較してください。</h3>
+<h3>ex-04.sql：JOIN条件変更による <code>Hash Join</code> と <code>Nested Loop</code> の切替を比較してください。</h3>
 <p><strong>課題</strong>：ステップ1〜3を実行し、以下の問いに答えてください。</p>
 <ol>
   <li>各ステップで選ばれたJOINノード（<code>Hash Join</code> / <code>Nested Loop</code>）を整理してください。</li>
@@ -989,7 +1072,7 @@ GROUP BY c.segment;
   <p>
   1. 抽出件数が少ない条件では <code>Nested Loop</code>、件数が増える条件では <code>Hash Join</code> が選ばれました。<br>
   2. 理由は入力行数の差です。外側行数が小さいと逐次探索が有利ですが、行数が増えるとハッシュ結合が有利になります。<br>
-  3. loops と実行時間を比較すると、対象行が少ない条件で最も効率が高いことを確認できました。
+  3. <code>loops</code> と実行時間を比較すると、対象行が少ない条件で最も効率が高いことを確認できました。
   </p>
 </details>
 
@@ -1114,7 +1197,7 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
 </details>
 
 <div class="column">
-  <div class="column-title">追加演習：自分の業務SQLを1本持ち込み、同じ手順で評価してみましょう</div>
+  <div class="column-title">追加演習：自分で作成したSQLを1本持ち込み、同じ手順で評価してみましょう</div>
   <p class="column-note">
     現在の計画、仮説、改善SQL、再測定結果を1セットで残してください。比較可能な記録があると再発防止に役立ちます。
   </p>
@@ -1123,7 +1206,7 @@ SELECT * FROM orders WHERE status = 'new' AND shipping_pref = 'tokyo';
 <details>
   <summary>追加演習の解答例</summary>
   <p>
-    追加演習は「1本の業務SQLを、同じ条件で前後比較できる形にする」ことが正解です。
+    追加演習は「1本の練習用SQLを、同じ条件で前後比較できる形にする」ことが正解です。
     まず現状計測を3回行って中央値を記録し、次に仮説に基づく変更を1つだけ適用して再計測します。
     変更を同時に複数入れると、どれが効いたか説明できなくなるため避けてください。
   </p>
@@ -1303,7 +1386,7 @@ ORDER BY transfer_count DESC;
   </p>
 </div>
 
-<p class="footer-text">制作時間：22時間</p>
+<p class="footer-text">制作時間：25時間</p>
 <footer class="footer">
   <a class="footer-link" href="https://github.com/Tsubasa213" target="_blank" rel="noopener noreferrer">GitHub</a>
   <p class="footer-text">© copyright 2026 Tsubasa213/つばさ all right resolved.</p>
