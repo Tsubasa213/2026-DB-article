@@ -299,6 +299,15 @@ WALが残っていても<span class="highlight">WALだけでは復旧できな�
     「完全コピーがない状態」と「完全コピーがある状態」で、復旧できる範囲がどう違うかを比較して説明してください。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    <code>WAL</code> は差分ログなので、適用先となる起点（ベースバックアップ）がなければ復旧を開始できません。<br>
+    完全コピーがない状態では、どの時点にも戻せません。<br>
+    一方、完全コピーがある状態なら、そこから <code>WAL</code> を順に再生し、<code>recovery_target_time</code> などで停止時点を指定できます。
+  </p>
+</details>
 
 <h3>4.3 ベースバックアップの役割</h3>
 <p>
@@ -821,6 +830,16 @@ pg_archivecleanup /backup/wal_archive 0000000100000000000000A3
     消してよいWALの範囲を説明しやすくなります。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    安全条件は「保持すべき最古の復旧時点」より前の <code>WAL</code> だけを削除することです。<br>
+    先に復旧方針（どのベースバックアップを起点に、どこまで戻す可能性があるか）を確定し、
+    その範囲をカバーする <code>WAL</code> は必ず残します。<br>
+    運用では <code>pg_archivecleanup</code> を使い、削除前後で復旧テスト可能性を確認するのが安全です。
+  </p>
+</details>
 
 <h3>定着確認（第6章）</h3>
 <ul>
@@ -1080,12 +1099,22 @@ FROM x_gold_transfers;
 </ul>
 
 <div class="column">
-  <div class="column-title">最終演習：PITR手順を3分で説明してください</div>
+  <div class="column-title">最終演習：PITR手順を説明してください</div>
   <p class="column-note">
     「起点（ベースバックアップ）」「履歴（WAL）」「停止条件（recovery_target）」の3要素を順番に説明すると、
     実務でも共有しやすい説明になります。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <ol>
+    <li><strong>起点</strong>：まずベースバックアップを復旧し、再生開始点を作る。</li>
+    <li><strong>履歴</strong>：<code>restore_command</code> で <code>WAL</code> を取り込み、時系列に再生する。</li>
+    <li><strong>停止条件</strong>：<code>recovery_target_time</code>（またはLSN）で停止位置を指定する。</li>
+    <li><strong>復帰</strong>：必要に応じて <code>pg_wal_replay_resume()</code> で通常運用へ戻す。</li>
+  </ol>
+</details>
 
 
 <p class="footer-text"><span class="highlight">制作時間：28時間</span></p>

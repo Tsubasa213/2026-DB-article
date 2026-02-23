@@ -559,6 +559,16 @@ WHERE status = 'canceled';
     実行時間だけでなく、<code>Node Type</code>・<code>loops</code>・<code>buffers</code> の差を比較して、どちらが目的クエリに適しているか説明してみてください。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    比較対象SQLが <code>WHERE status = ... AND order_date &gt;= ...</code> の形なら、
+    先頭列が <code>status</code> の索引（例：<code>(status, order_date)</code>）が有利になりやすいです。<br>
+    判断時は <code>Node Type</code> だけでなく、<code>loops</code> と <code>BUFFERS(read/hit)</code> を必ずセットで確認します。<br>
+    最終的に、実行時間中央値とI/O量が小さい列順を採用候補にします。
+  </p>
+</details>
 
 <h3>定着確認（第5章）</h3>
 <ul>
@@ -651,6 +661,15 @@ ANALYZE orders;
     status と shipping_pref のように、列同士の依存関係が強いケースで効果を発揮しやすいです。
   </p>
 </div>
+<details>
+  <summary>解答例を見る</summary>
+  <p><strong>解答例</strong></p>
+  <p>
+    <code>extended statistics</code> は、複数列の独立性仮定が崩れるケースで有効です。<br>
+    例として、<code>status='paid'</code> の行は <code>shipping_pref='tokyo'</code> に偏る、のような依存関係がある場合に推定精度が改善します。<br>
+    <code>CREATE STATISTICS ... (dependencies)</code> と <code>ANALYZE</code> 後に、<code>rows</code> と <code>actual rows</code> の乖離縮小を確認してください。
+  </p>
+</details>
 
 <h3>定着確認（第6章）</h3>
 <ul>
