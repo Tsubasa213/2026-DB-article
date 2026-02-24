@@ -158,7 +158,7 @@ ANALYZE orders;
 
 <h3>定着確認（第2章）</h3>
 <ul>
-  <li>性能確認では <span class="masked"><code>EXPLAIN ANALYZE</code></span> で実測を取るべきである。</li>
+  <li>性能確認では <span class="masked">EXPLAIN ANALYZE</span> で実測を取るべきである。</li>
   <li>更新系SQLの検証は <span class="masked">本番ではなく検証環境</span> で行うべきである。</li>
   <li>比較時は <span class="masked">同一SQLを複数回実行</span> し、中央値で判断すべきである。</li>
 </ul>
@@ -349,9 +349,9 @@ Buffers: shared hit=1200 read=18450
 
 <h3>定着確認（第3章）</h3>
 <ul>
-  <li>実行計画の初見では <span class="masked"><code>Node Type / rows / actual rows / loops</code></span> を優先確認すべきである。</li>
+  <li>実行計画の初見では <span class="masked">Node Type / rows / actual rows / loops</span> を優先確認すべきである。</li>
   <li><code>cost</code> は <span class="masked">相対評価値</span> であり、実時間と一致しない前提で扱うべきである。</li>
-  <li>原因切り分けでは <span class="masked"><code>buffers read/hit</code></span> を実行時間と併せて確認すべきである。</li>
+  <li>原因切り分けでは <span class="masked">buffers read/hit</span> を実行時間と併せて確認すべきである。</li>
 </ul>
 
 <h2>4. データ量と実行計画の変化</h2>
